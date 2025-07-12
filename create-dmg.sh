@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# create-dmg.sh - Create DMG installer for MAVLink GCS
+# create-dmg.sh - Create DMG installer for NazarX GCS
 
 echo "=== Creating DMG with create-dmg tool ==="
 
@@ -11,26 +11,41 @@ if ! command -v create-dmg &> /dev/null; then
 fi
 
 # Build app first if needed
-if [ ! -d "target/installer/MAVLink GCS.app" ]; then
+if [ ! -d "target/installer/NazarX GCS.app" ]; then
     echo "Building application first..."
     ./jpackage-with-javafx.sh
 
-    # Extract app from DMG if needed
-    if [ -f "target/installer/*.dmg" ]; then
-        hdiutil attach target/installer/*.dmg -nobrowse -quiet
-        cp -R "/Volumes/MAVLink GCS/MAVLink GCS.app" "target/installer/"
-        hdiutil detach "/Volumes/MAVLink GCS" -quiet
-        rm target/installer/*.dmg
+    # Extract app from DMG if needed (jpackage creates a DMG first)
+    # shellcheck disable=SC2144
+    if [ -f target/installer/*.dmg ]; then
+        echo "Extracting app from jpackage DMG..."
+        # Find the DMG file
+        DMG_FILE=$(find target/installer -name "*.dmg" | head -1)
+        if [ -n "$DMG_FILE" ]; then
+            hdiutil attach "$DMG_FILE" -nobrowse -quiet
+            # The volume name should match the app name
+            cp -R "/Volumes/NazarX GCS/NazarX GCS.app" "target/installer/"
+            hdiutil detach "/Volumes/NazarX GCS" -quiet
+            rm "$DMG_FILE"
+        fi
     fi
+fi
+
+# Check if app exists
+if [ ! -d "target/installer/NazarX GCS.app" ]; then
+    echo "Error: NazarX GCS.app not found after build!"
+    echo "Available files in target/installer:"
+    ls -la target/installer/
+    exit 1
 fi
 
 # Create DMG with create-dmg
 echo "Creating custom DMG..."
 
 # Set variables
-APP_NAME="MAVLink GCS"
+APP_NAME="NazarX GCS"
 VERSION="1.0"
-DMG_NAME="MAVLink-GCS-${VERSION}"
+DMG_NAME="NazarX-GCS-${VERSION}"
 
 # Remove old DMG if exists
 rm -f "target/installer/${DMG_NAME}.dmg"
@@ -39,27 +54,22 @@ rm -f "target/installer/${DMG_NAME}.dmg"
 rm -f target/installer/rw.*.dmg
 rm -f target/installer/*.dmg.bak
 
-# Create DMG with all the nice features
-create-dmg \
-  --volname "${APP_NAME} ${VERSION}" \
-  --window-pos 200 120 \
-  --window-size 600 400 \
-  --icon-size 100 \
-  --icon "${APP_NAME}.app" 150 200 \
-  --hide-extension "${APP_NAME}.app" \
-  --app-drop-link 450 200 \
-  --eula "src/main/resources/license.txt" \
-  --text-size 14 \
-  --volicon "src/main/resources/app.icns" \
-  --background "src/main/resources/dmg-background.png" \
-  --no-internet-enable \
-  "target/installer/${DMG_NAME}.dmg" \
-  "target/installer/${APP_NAME}.app"
+# Create resources directory if it doesn't exist
+mkdir -p src/main/resources
 
-# If no background exists, create without it
+# Check if resources exist, if not create minimal ones
 if [ ! -f "src/main/resources/dmg-background.png" ]; then
-    echo "No background image found. Creating DMG without background..."
+    echo "Creating minimal background image..."
+    # Create a simple 600x400 background using ImageMagick if available
+    if command -v convert &> /dev/null; then
+        convert -size 600x400 xc:'#f0f0f0' -fill '#333333' -pointsize 24 -gravity center \
+                -annotate +0+0 'NazarX Ground Control Station' src/main/resources/dmg-background.png
+    fi
+fi
 
+# Create DMG with all the nice features if background exists
+if [ -f "src/main/resources/dmg-background.png" ]; then
+    echo "Creating DMG with custom background..."
     create-dmg \
       --volname "${APP_NAME} ${VERSION}" \
       --window-pos 200 120 \
@@ -68,8 +78,22 @@ if [ ! -f "src/main/resources/dmg-background.png" ]; then
       --icon "${APP_NAME}.app" 150 200 \
       --hide-extension "${APP_NAME}.app" \
       --app-drop-link 450 200 \
-      --text-size 14 \
-      --volicon "src/main/resources/app.icns" \
+      --text-size 15 \
+      --background "src/main/resources/dmg-background.png" \
+      --no-internet-enable \
+      "target/installer/${DMG_NAME}.dmg" \
+      "target/installer/${APP_NAME}.app"
+else
+    echo "Creating DMG without background..."
+    create-dmg \
+      --volname "${APP_NAME} ${VERSION}" \
+      --window-pos 200 120 \
+      --window-size 600 400 \
+      --icon-size 100 \
+      --icon "${APP_NAME}.app" 150 200 \
+      --hide-extension "${APP_NAME}.app" \
+      --app-drop-link 450 200 \
+      --text-size 15 \
       --no-internet-enable \
       "target/installer/${DMG_NAME}.dmg" \
       "target/installer/${APP_NAME}.app"
@@ -83,9 +107,3 @@ echo "Location: target/installer/${DMG_NAME}.dmg"
 echo "Cleaning up temporary files..."
 rm -f target/installer/rw.*.dmg
 rm -f target/installer/*.dmg.bak
-
-echo ""
-echo "To add a custom background:"
-echo "1. Create a 600x400 PNG image"
-echo "2. Save as: src/main/resources/dmg-background.png"
-echo "3. Run this script again"
