@@ -90,13 +90,14 @@ else
       --window-pos 200 120 \
       --window-size 600 400 \
       --icon-size 100 \
-      --icon "${APP_NAME}.app" 150 200 \
+      --icon "${APP_NAME}.app" 150 150 \
       --hide-extension "${APP_NAME}.app" \
-      --app-drop-link 450 200 \
-      --text-size 15 \
+      --app-drop-link 450 150 \
+      --text-size 16 \
       --no-internet-enable \
       "target/installer/${DMG_NAME}.dmg" \
       "target/installer/${APP_NAME}.app"
+
 fi
 
 echo ""

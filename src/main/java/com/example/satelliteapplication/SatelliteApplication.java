@@ -69,7 +69,7 @@ public class SatelliteApplication extends Application {
     public void start(Stage stage) {
         Image icon = new Image("icon.png");
         stage.getIcons().add(icon);
-        stage.setTitle("NazarX Ground Station");
+        stage.setTitle("NazarX Ground Control Station");
 
         VBox root = new VBox(10);
         root.setPadding(new Insets(10));
