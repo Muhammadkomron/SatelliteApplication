@@ -8,26 +8,21 @@
 <?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.Region?>
 <?import javafx.scene.web.WebView?>
 
-<VBox fx:controller="com.example.satelliteapplication.controller.MainController"
-      maxHeight="-Infinity" maxWidth="-Infinity"
-      minHeight="-Infinity" minWidth="-Infinity"
-      prefHeight="720.0" prefWidth="1280.0"
-      spacing="10.0"
-      stylesheets="@../../css/application.css"
-      xmlns="http://javafx.com/javafx/24.0.1"
-      xmlns:fx="http://javafx.com/fxml/1">
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="720.0" prefWidth="1280.0" spacing="10.0" stylesheets="@../../css/application.css" xmlns="http://javafx.com/javafx/24.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.satelliteapplication.controller.MainController">
    <children>
       <!-- Connection Panel -->
       <StackPane>
          <children>
-            <VBox styleClass="connection-box" spacing="15.0">
+            <VBox spacing="5.0" styleClass="connection-box">
                <children>
                   <!-- Section Header -->
                   <Label styleClass="section-header" text="Connection Settings" />
@@ -114,98 +109,110 @@
       </StackPane>
 
       <!-- Main Content Area - Split Layout -->
-      <HBox VBox.vgrow="ALWAYS" spacing="10.0">
+      <HBox spacing="10.0" VBox.vgrow="ALWAYS">
          <VBox.margin>
-            <Insets left="20.0" right="20.0" bottom="20.0" />
+            <Insets bottom="20.0" left="20.0" right="20.0" />
          </VBox.margin>
          <children>
             <!-- Left Side - Telemetry and Video -->
-            <VBox spacing="10.0" HBox.hgrow="ALWAYS" prefWidth="600.0">
+            <VBox prefWidth="650.0" minWidth="650.0" maxWidth="650.0" spacing="10.0">
                <children>
                   <!-- Top Left - Telemetry Data -->
-                  <StackPane VBox.vgrow="ALWAYS" styleClass="content-area">
+                  <StackPane styleClass="content-area" prefHeight="300.0" minHeight="300.0">
                      <children>
                         <!-- Telemetry Panel (shown when connected) -->
-                        <VBox fx:id="telemetryPanel" alignment="TOP_LEFT" spacing="10.0" visible="false" managed="false">
+                        <VBox fx:id="telemetryPanel" alignment="TOP_LEFT" managed="false" spacing="10.0" visible="false">
                            <padding>
                               <Insets bottom="15.0" left="20.0" right="20.0" top="15.0" />
                            </padding>
                            <children>
-                              <Label text="Telemetry Data" styleClass="section-header" />
+                              <Label styleClass="section-header" text="Telemetry Data" />
                               <GridPane hgap="30.0" vgap="12.0">
                                  <children>
                                     <!-- Column 1 -->
-                                    <Label text="Battery:" styleClass="telemetry-label" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                                    <Label fx:id="batteryLabel" text="0.0V (0%)" styleClass="telemetry-value" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                                    <Label styleClass="telemetry-label" text="Battery:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                    <Label fx:id="batteryLabel" styleClass="telemetry-value" text="0.0V (0%)" GridPane.columnIndex="1" GridPane.rowIndex="0" />
 
-                                    <Label text="Altitude:" styleClass="telemetry-label" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                                    <Label fx:id="altitudeLabel" text="0.0 m" styleClass="telemetry-value" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                                    <Label styleClass="telemetry-label" text="Altitude:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                    <Label fx:id="altitudeLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="1" GridPane.rowIndex="1" />
 
-                                    <Label text="Ground Speed:" styleClass="telemetry-label" GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                                    <Label fx:id="speedLabel" text="0.0 m/s" styleClass="telemetry-value" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <Label styleClass="telemetry-label" text="Ground Speed:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                                    <Label fx:id="speedLabel" styleClass="telemetry-value" text="0.0 m/s" GridPane.columnIndex="1" GridPane.rowIndex="2" />
 
-                                    <Label text="Satellites:" styleClass="telemetry-label" GridPane.columnIndex="0" GridPane.rowIndex="3" />
-                                    <Label fx:id="satellitesLabel" text="0" styleClass="telemetry-value" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                                    <Label styleClass="telemetry-label" text="Satellites:" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                                    <Label fx:id="satellitesLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="1" GridPane.rowIndex="3" />
 
                                     <!-- Column 2 -->
-                                    <Label text="GPS Position:" styleClass="telemetry-label" GridPane.columnIndex="2" GridPane.rowIndex="0" />
-                                    <Label fx:id="gpsLabel" text="No GPS" styleClass="telemetry-value" GridPane.columnIndex="3" GridPane.rowIndex="0" />
+                                    <Label styleClass="telemetry-label" text="GPS Position:" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                                    <Label fx:id="gpsLabel" styleClass="telemetry-value" text="No GPS" GridPane.columnIndex="3" GridPane.rowIndex="0" />
 
-                                    <Label text="Flight Mode:" styleClass="telemetry-label" GridPane.columnIndex="2" GridPane.rowIndex="1" />
-                                    <Label fx:id="flightModeLabel" text="Unknown" styleClass="telemetry-value" GridPane.columnIndex="3" GridPane.rowIndex="1" />
+                                    <Label styleClass="telemetry-label" text="Flight Mode:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                                    <Label fx:id="flightModeLabel" styleClass="telemetry-value" text="Unknown" GridPane.columnIndex="3" GridPane.rowIndex="1" />
 
-                                    <Label text="Arm Status:" styleClass="telemetry-label" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-                                    <Label fx:id="armStatusLabel" text="DISARMED" styleClass="telemetry-value" GridPane.columnIndex="3" GridPane.rowIndex="2" />
+                                    <Label styleClass="telemetry-label" text="Arm Status:" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                                    <Label fx:id="armStatusLabel" styleClass="telemetry-value" text="DISARMED" GridPane.columnIndex="3" GridPane.rowIndex="2" />
 
-                                    <Label text="Attitude:" styleClass="telemetry-label" GridPane.columnIndex="2" GridPane.rowIndex="3" />
-                                    <Label fx:id="rollPitchYawLabel" text="R:0° P:0° Y:0°" styleClass="telemetry-value" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+                                    <Label styleClass="telemetry-label" text="Attitude:" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                                    <Label fx:id="rollPitchYawLabel" styleClass="telemetry-value" text="R:0° P:0° Y:0°" GridPane.columnIndex="3" GridPane.rowIndex="3" />
                                  </children>
+                                 <columnConstraints>
+                                    <ColumnConstraints minWidth="100.0" prefWidth="100.0" />
+                                    <ColumnConstraints minWidth="120.0" prefWidth="120.0" />
+                                    <ColumnConstraints minWidth="100.0" prefWidth="100.0" />
+                                    <ColumnConstraints minWidth="180.0" prefWidth="180.0" />
+                                 </columnConstraints>
+                                 <rowConstraints>
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                    <RowConstraints />
+                                 </rowConstraints>
                               </GridPane>
                            </children>
                         </VBox>
 
                         <!-- Placeholder for telemetry (shown when disconnected) -->
-                        <VBox fx:id="telemetryPlaceholder" alignment="CENTER" spacing="10.0">
+                        <VBox fx:id="telemetryPlaceholder" alignment="CENTER" spacing="10.0" styleClass="connection-box">
                            <children>
-                              <ImageView fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
+                              <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
                                  <image>
                                     <Image url="@../../images/dark-icon.png" />
                                  </image>
                               </ImageView>
-                              <Label text="Telemetry data will appear here" textFill="#7A8BB8" styleClass="info-label" />
+                              <Label styleClass="info-label" text="Telemetry data will appear here" textFill="#7A8BB8" />
                            </children>
                         </VBox>
                      </children>
                   </StackPane>
 
                   <!-- Bottom Left - Video Feed -->
-                  <StackPane VBox.vgrow="ALWAYS" styleClass="content-area">
+                  <StackPane styleClass="content-area" VBox.vgrow="ALWAYS" minHeight="250.0">
                      <children>
                         <!-- Video Panel (shown when connected) -->
-                        <VBox fx:id="videoPanel" alignment="TOP_LEFT" spacing="10.0" visible="false" managed="false">
+                        <VBox fx:id="videoPanel" alignment="TOP_LEFT" managed="false" spacing="10.0" styleClass="connection-box" visible="false">
                            <padding>
                               <Insets bottom="15.0" left="20.0" right="20.0" top="15.0" />
                            </padding>
                            <children>
-                              <Label text="Video Feed" styleClass="section-header" />
+                              <Label styleClass="section-header" text="Video Feed" />
                               <!-- Video player will be added here dynamically -->
                               <StackPane fx:id="videoContainer" styleClass="video-container" VBox.vgrow="ALWAYS">
                                  <children>
-                                    <Label text="Video feed connected" styleClass="info-label" />
+                                    <Label styleClass="info-label" text="Video feed connected" />
                                  </children>
                               </StackPane>
                            </children>
                         </VBox>
 
                         <!-- Placeholder for video (shown when disconnected) -->
-                        <VBox fx:id="videoPlaceholder" alignment="CENTER" spacing="10.0">
+                        <VBox fx:id="videoPlaceholder" alignment="CENTER" spacing="10.0" styleClass="connection-box">
                            <children>
-                              <ImageView fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
+                              <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
                                  <image>
                                     <Image url="@../../images/dark-icon.png" />
                                  </image>
                               </ImageView>
-                              <Label text="Video feed will appear here" textFill="#7A8BB8" styleClass="info-label" />
+                              <Label styleClass="info-label" text="Video feed will appear here" textFill="#7A8BB8" />
                            </children>
                         </VBox>
                      </children>
@@ -214,35 +221,35 @@
             </VBox>
 
             <!-- Right Side - Map -->
-            <StackPane HBox.hgrow="ALWAYS" styleClass="content-area">
+            <StackPane styleClass="content-area" HBox.hgrow="ALWAYS" minWidth="400.0">
                <children>
                   <!-- Map Panel (shown when telemetry connected) -->
-                  <VBox fx:id="mapPanel" alignment="TOP_LEFT" spacing="10.0" visible="false" managed="false">
+                  <VBox fx:id="mapPanel" alignment="TOP_LEFT" managed="false" spacing="10.0" visible="false">
                      <padding>
                         <Insets bottom="15.0" left="20.0" right="20.0" top="15.0" />
                      </padding>
                      <children>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                            <children>
-                              <Label text="Satellite Location &amp; Path" styleClass="section-header" />
+                              <Label styleClass="section-header" text="Satellite Location &amp; Path" />
                               <Region HBox.hgrow="ALWAYS" />
-                              <Button fx:id="clearPathBtn" text="Clear Path" styleClass="map-button" />
-                              <Button fx:id="centerMapBtn" text="Center" styleClass="map-button" />
+                              <Button fx:id="clearPathBtn" styleClass="map-button" text="Clear Path" />
+                              <Button fx:id="centerMapBtn" styleClass="map-button" text="Center" />
                            </children>
                         </HBox>
-                        <WebView fx:id="mapWebView" VBox.vgrow="ALWAYS" prefHeight="500.0" />
+                        <WebView fx:id="mapWebView" prefHeight="500.0" VBox.vgrow="ALWAYS" />
                      </children>
                   </VBox>
 
                   <!-- Placeholder for map (shown when disconnected) -->
-                  <VBox fx:id="mapPlaceholder" alignment="CENTER" spacing="10.0">
+                  <VBox fx:id="mapPlaceholder" alignment="CENTER" spacing="10.0" styleClass="connection-box">
                      <children>
-                        <ImageView fitHeight="80.0" fitWidth="80.0" pickOnBounds="true" preserveRatio="true">
+                        <ImageView fitHeight="100.0" fitWidth="100.0" pickOnBounds="true" preserveRatio="true">
                            <image>
                               <Image url="@../../images/dark-icon.png" />
                            </image>
                         </ImageView>
-                        <Label text="Map will appear here when telemetry is connected" textFill="#7A8BB8" styleClass="info-label" />
+                        <Label styleClass="info-label" text="Map will appear here when telemetry is connected" textFill="#7A8BB8" />
                      </children>
                   </VBox>
                </children>

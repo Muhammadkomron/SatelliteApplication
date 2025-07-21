@@ -240,6 +240,21 @@ StackPane {
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 2);
 }
 
+/* Telemetry panel - ensure transparent background */
+#telemetryPanel {
+    -fx-background-color: transparent;
+}
+
+/* Video panel - ensure transparent background */
+#videoPanel {
+    -fx-background-color: transparent;
+}
+
+/* Map panel - ensure transparent background */
+#mapPanel {
+    -fx-background-color: transparent;
+}
+
 /* Video container styling */
 .video-container {
     -fx-background-color: #000000;
@@ -275,12 +290,13 @@ StackPane {
 .telemetry-value {
     -fx-font-family: "Consolas", "Monaco", monospace;
     -fx-text-fill: #3498db;
-    -fx-font-size: 14pt;
+    -fx-font-size: 13pt;
 }
 
 .telemetry-label {
     -fx-text-fill: #7f8c8d;
-    -fx-font-size: 11pt;
+    -fx-font-size: 12pt;
+    -fx-font-weight: 600;
 }
 
 /* Alert styling */
