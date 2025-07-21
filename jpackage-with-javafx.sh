@@ -41,7 +41,7 @@ jpackage \
   --input target/app \
   --dest target/installer \
   --main-jar satellite-gcs.jar \
-  --main-class com.example.satelliteapplication.SatelliteApplication \
+  --main-class com.example.satelliteapplication.Main \
   --module-path "$JAVAFX_PATH:target/app/libs" \
   --add-modules javafx.controls \
   --mac-package-identifier "com.example.satelliteapplication" \

@@ -2,8 +2,10 @@ package com.example.satelliteapplication;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.layout.*;
@@ -20,13 +22,14 @@ import io.dronefleet.mavlink.minimal.Heartbeat;
 import java.io.IOException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 
-public class SatelliteApplication extends Application {
+public class SatelliteGCS1 extends Application {
 
     private SerialPort serialPort;
     private MavlinkConnection mavlinkConnection;
@@ -66,33 +69,22 @@ public class SatelliteApplication extends Application {
     }
 
     @Override
-    public void start(Stage stage) {
-        Image icon = new Image("icon.png");
+    public void start(Stage stage) throws IOException {
+        Image icon = new Image("/images/light-icon.png");
         stage.getIcons().add(icon);
         stage.setTitle("NazarX Ground Control Station");
-
-        VBox root = new VBox(10);
-        root.setPadding(new Insets(10));
-        root.setStyle("-fx-background-color: #f0f0f0;");
-
-        // Connection Panel
-        HBox connectionPanel = createConnectionPanel();
-
-        // Telemetry Display Panel
-        GridPane telemetryPanel = createTelemetryPanel();
-
-        // Log Panel
-        VBox logPanel = createLogPanel();
-
-        root.getChildren().addAll(connectionPanel, telemetryPanel, logPanel);
-
-        Scene scene = new Scene(root, 800, 600);
-        stage.setFullScreen(true);
+        Parent root = FXMLLoader.load(Objects.requireNonNull(
+                getClass().getResource("/fxml/screen/MainScreen.fxml"))
+        );
+        Scene scene = new Scene(root);
+        scene.getStylesheets().add(Objects.requireNonNull(
+                getClass().getResource("/css/application.css")).toExternalForm()
+        );
         stage.setScene(scene);
+        stage.setMaximized(true);
         stage.show();
-
         // Initialize
-        refreshPorts();
+        // refreshPorts();
     }
 
     private HBox createConnectionPanel() {
@@ -490,11 +482,11 @@ public class SatelliteApplication extends Application {
         alert.showAndWait();
     }
 
-    @Override
-    public void stop() {
-        scheduler.shutdownNow();
-        disconnect();
-    }
+//    @Override
+//    public void stop() {
+//        scheduler.shutdownNow();
+//        disconnect();
+//    }
 
     public static void main(String[] args) {
         launch(args);
