@@ -54,21 +54,9 @@ rm -f "target/installer/${DMG_NAME}.dmg"
 rm -f target/installer/rw.*.dmg
 rm -f target/installer/*.dmg.bak
 
-# Create resources directory if it doesn't exist
-mkdir -p src/main/resources/satelliteapplication/images
-
-# Check if resources exist, if not create minimal ones
-if [ ! -f "src/main/resources/satelliteapplication/images/dmg-background.png" ]; then
-    echo "Creating minimal background image..."
-    # Create a simple 600x400 background using ImageMagick if available
-    if command -v convert &> /dev/null; then
-        convert -size 600x400 xc:'#f0f0f0' -fill '#333333' -pointsize 24 -gravity center \
-                -annotate +0+0 'NazarX Ground Control Station' src/main/resources/satelliteapplication/images/dmg-background.png
-    fi
-fi
 
 # Create DMG with all the nice features if background exists
-if [ -f "src/main/resources/satelliteapplication/images/dmg-background.png" ]; then
+if [ -f "src/main/resources/images/dmg-background.png" ]; then
     echo "Creating DMG with custom background..."
     create-dmg \
       --volname "${APP_NAME} ${VERSION}" \
@@ -79,7 +67,7 @@ if [ -f "src/main/resources/satelliteapplication/images/dmg-background.png" ]; t
       --hide-extension "${APP_NAME}.app" \
       --app-drop-link 450 200 \
       --text-size 15 \
-      --background "src/main/resources/satelliteapplication/images/dmg-background.png" \
+      --background "src/main/resources/images/dmg-background.png" \
       --no-internet-enable \
       "target/installer/${DMG_NAME}.dmg" \
       "target/installer/${APP_NAME}.app"
@@ -97,7 +85,6 @@ else
       --no-internet-enable \
       "target/installer/${DMG_NAME}.dmg" \
       "target/installer/${APP_NAME}.app"
-
 fi
 
 echo ""

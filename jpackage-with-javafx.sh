@@ -34,7 +34,7 @@ cd ../..
 jpackage \
   --type dmg \
   --name "NazarX GCS" \
-  --icon src/main/resources/app.icns \
+  --icon src/main/resources/images/app.icns \
   --app-version "1.0" \
   --vendor "NazarX" \
   --description "NazarX Ground Control Station" \
