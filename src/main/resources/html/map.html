@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        .leaflet-container {
+            background: #ddd;
+        }
+        .satellite-marker {
+            background-color: #e74c3c;
+            border: 3px solid white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+            position: relative;
+            left: -8px;
+            top: -8px;
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    // Global variables
+    var map = null;
+    var marker = null;
+    var pathLine = null;
+    var pathCoordinates = [];
+
+    // Initialize map
+    function init() {
+        map = L.map('map').setView([41.2995, 69.2401], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        var satelliteIcon = L.divIcon({
+            className: 'satellite-marker',
+            iconSize: [16, 16]
+        });
+
+        marker = L.marker([41.2995, 69.2401], {
+            icon: satelliteIcon
+        }).addTo(map);
+
+        pathLine = L.polyline([], {
+            color: '#3498db',
+            weight: 4,
+            opacity: 0.7
+        }).addTo(map);
+
+        // Initial resize
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 100);
+    }
+
+    // Update position
+    function updatePosition(lat, lon) {
+        if (map && marker && pathLine) {
+            var newLatLng = [lat, lon];
+            marker.setLatLng(newLatLng);
+            pathCoordinates.push(newLatLng);
+            pathLine.setLatLngs(pathCoordinates);
+
+            if (!map.getBounds().contains(newLatLng)) {
+                map.panTo(newLatLng);
+            }
+        }
+    }
+
+    // Clear path
+    function clearPath() {
+        pathCoordinates = [];
+        if (pathLine) {
+            pathLine.setLatLngs([]);
+        }
+    }
+
+    // Center map
+    function centerMap() {
+        if (map && marker) {
+            map.setView(marker.getLatLng(), map.getZoom());
+        }
+    }
+
+    // Initialize on load
+    window.onload = init;
+</script>
+</body>
+</html>

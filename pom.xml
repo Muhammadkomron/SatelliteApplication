@@ -38,6 +38,20 @@
             <version>${javafx.version}</version>
         </dependency>
 
+        <!-- JavaFX Swing - Required for SwingFXUtils -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+
+        <!-- JavaCV (Java wrapper for OpenCV) -->
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacv-platform</artifactId>
+            <version>1.5.7</version>
+        </dependency>
+
         <!-- Serial Port Library -->
         <dependency>
             <groupId>com.fazecast</groupId>
@@ -72,22 +86,6 @@
                 </configuration>
             </plugin>
 
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
-                    <mainClass>com.example.satelliteapplication.Main</mainClass>
-                    <classpathScope>runtime</classpathScope>
-                    <arguments>
-                        <argument>--enable-native-access=ALL-UNNAMED</argument>
-                        <argument>--enable-native-access=javafx.graphics</argument>
-                        <argument>--add-opens=java.base/java.lang=ALL-UNNAMED</argument>
-                        <argument>--add-opens=java.base/sun.nio.ch=ALL-UNNAMED</argument>
-                    </arguments>
-                </configuration>
-            </plugin>
-
             <!-- JavaFX plugin with native access args -->
             <plugin>
                 <groupId>org.openjfx</groupId>
@@ -95,6 +93,16 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.example.satelliteapplication.Main</mainClass>
+                    <commandlineArgs>
+                        --enable-native-access=ALL-UNNAMED
+                        --enable-native-access=javafx.graphics
+                        --enable-native-access=javafx.web
+                    </commandlineArgs>
+                    <options>
+                        <option>-Djava.library.path=/opt/homebrew/opt/opencv/lib</option>
+                        <option>-Djava.awt.headless=false</option>
+                        <option>-Dorg.bytedeco.javacpp.logger.debug=true</option>
+                    </options>
                 </configuration>
             </plugin>
         </plugins>
