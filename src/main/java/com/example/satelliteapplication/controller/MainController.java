@@ -6,9 +6,7 @@ import javafx.collections.ObservableList;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
@@ -18,17 +16,28 @@ import javafx.scene.web.WebView;
 import com.example.satelliteapplication.service.VideoCapture;
 import com.example.satelliteapplication.service.VideoCapture.VideoSource;
 
+import com.fazecast.jSerialComm.SerialPort;
+import io.dronefleet.mavlink.MavlinkConnection;
+import io.dronefleet.mavlink.MavlinkMessage;
+import io.dronefleet.mavlink.common.*;
+import io.dronefleet.mavlink.minimal.Heartbeat;
+
+import java.io.IOException;
 import java.net.URL;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class MainController implements Initializable {
 
     // Connection Controls
-    @FXML private ComboBox<String> telemetryComboBox;
+    @FXML private ComboBox<SerialPortInfo> telemetryComboBox;
     @FXML private ComboBox<VideoSource> videoComboBox;
     @FXML private Button telemetryRefreshBtn;
     @FXML private Button telemetryConnectBtn;
@@ -66,8 +75,12 @@ public class MainController implements Initializable {
     private boolean telemetryConnected = false;
     private boolean videoConnected = false;
 
-    // Timer for telemetry updates
-    private Timer telemetryTimer;
+    // MAVLink components
+    private SerialPort serialPort;
+    private MavlinkConnection mavlinkConnection;
+    private Thread readThread;
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     // Video capture
     private VideoCapture videoCapture;
@@ -76,8 +89,24 @@ public class MainController implements Initializable {
     private WebEngine webEngine;
     private double currentLat = 41.2995;
     private double currentLon = 69.2401;
-    private List<double[]> pathPoints = new ArrayList<>();
     private boolean mapInitialized = false;
+    private boolean hasValidGpsPosition = false;
+
+    // Helper class for serial port display
+    private static class SerialPortInfo {
+        SerialPort port;
+        String displayName;
+
+        SerialPortInfo(SerialPort port) {
+            this.port = port;
+            this.displayName = port.getSystemPortName() + " - " + port.getDescriptivePortName();
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -343,41 +372,41 @@ public class MainController implements Initializable {
     }
 
     private void refreshTelemetrySources() {
-        ObservableList<String> telemetrySources = FXCollections.observableArrayList();
+        telemetryComboBox.getItems().clear();
+        SerialPort[] ports = SerialPort.getCommPorts();
 
-        // TODO: Add actual telemetry source detection
-        // For now, add some example sources
-        telemetrySources.add("MAVLink - COM3");
-        telemetrySources.add("MAVLink - COM4");
-        telemetrySources.add("TCP - 127.0.0.1:14550");
-        telemetrySources.add("UDP - 0.0.0.0:14550");
-
-        telemetryComboBox.setItems(telemetrySources);
-        if (!telemetrySources.isEmpty()) {
-            telemetryComboBox.getSelectionModel().selectFirst();
+        for (SerialPort port : ports) {
+            // Look for CP2102 or similar descriptors that might indicate the LR900
+            String description = port.getDescriptivePortName().toLowerCase();
+            if (description.contains("cp210") || description.contains("usb") ||
+                    description.contains("serial") || description.contains("uart")) {
+                telemetryComboBox.getItems().add(new SerialPortInfo(port));
+            }
         }
+
+        if (!telemetryComboBox.getItems().isEmpty()) {
+            telemetryComboBox.getSelectionModel().select(0);
+        }
+
+        log("Found " + telemetryComboBox.getItems().size() + " potential LR900 ports");
     }
 
     private void refreshVideoSources() {
-        videoComboBox.setDisable(true);
-        videoRefreshBtn.setDisable(true);
+        // Create list of available video sources without detection
+        List<VideoSource> sources = new ArrayList<>();
 
-        // Run detection in background thread
-        new Thread(() -> {
-            List<VideoSource> sources = VideoCapture.getAvailableVideoSources();
+        // Add default USB camera options
+        sources.add(new VideoSource("USB Camera 0", 0, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("USB Camera 1", 1, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("USB Camera 2", 2, VideoCapture.VideoSourceType.USB_CAMERA));
 
-            Platform.runLater(() -> {
-                ObservableList<VideoSource> videoSources = FXCollections.observableArrayList(sources);
-                videoComboBox.setItems(videoSources);
+        // Add HDMI capture options
+        sources.add(new VideoSource("HDMI Capture 0", 3, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("HDMI Capture 1", 4, VideoCapture.VideoSourceType.USB_CAMERA));
 
-                if (!videoSources.isEmpty()) {
-                    videoComboBox.getSelectionModel().selectFirst();
-                }
+        ObservableList<VideoSource> videoSources = FXCollections.observableArrayList(sources);
+        videoComboBox.setItems(videoSources);
 
-                videoComboBox.setDisable(false);
-                videoRefreshBtn.setDisable(false);
-            });
-        }).start();
     }
 
     private void toggleTelemetryConnection() {
@@ -389,61 +418,293 @@ public class MainController implements Initializable {
     }
 
     private void connectTelemetry() {
-        String selectedSource = telemetryComboBox.getValue();
-        if (selectedSource == null) {
+        SerialPortInfo selected = telemetryComboBox.getValue();
+        if (selected == null) {
+            showAlert("Please select a port");
             return;
         }
 
+        serialPort = selected.port;
+
+        // Configure for LR900 defaults
+        serialPort.setBaudRate(57600); // Default for USB interface
+        serialPort.setNumDataBits(8);
+        serialPort.setNumStopBits(1);
+        serialPort.setParity(SerialPort.NO_PARITY);
+        // Increase timeout and add write timeout for LR900
+        serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 2000, 1000);
+
+        if (!serialPort.openPort()) {
+            showAlert("Failed to open port: " + serialPort.getSystemPortName());
+            return;
+        }
+
+        // Add a small delay to let the port stabilize
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        mavlinkConnection = MavlinkConnection.create(
+                serialPort.getInputStream(),
+                serialPort.getOutputStream()
+        );
+
+        isRunning.set(true);
+
+        // Start reading thread
+        readThread = new Thread(this::readMavlinkMessages);
+        readThread.setDaemon(true);
+        readThread.start();
+
         // Update UI
-        telemetryStatus.setText("● Connecting...");
-        telemetryStatus.getStyleClass().clear();
-        telemetryStatus.getStyleClass().add("status-connecting");
-        telemetryConnectBtn.setDisable(true);
+        Platform.runLater(() -> {
+            telemetryConnected = true;
+            telemetryStatus.setText("● Connected");
+            telemetryStatus.getStyleClass().clear();
+            telemetryStatus.getStyleClass().add("status-connected");
+            telemetryConnectBtn.setText("Disconnect");
+            telemetryConnectBtn.getStyleClass().remove("connect-button");
+            telemetryConnectBtn.getStyleClass().add("disconnect-button");
+            telemetryComboBox.setDisable(true);
 
-        // Simulate connection delay
-        new Thread(() -> {
-            try {
-                Thread.sleep(1000); // Simulate connection time
+            // Update display
+            updateContentDisplay();
+        });
 
-                Platform.runLater(() -> {
-                    // TODO: Implement actual telemetry connection logic here
+        log("Connected to " + serialPort.getSystemPortName() + " at 57600 baud");
+        log("Waiting for MAVLink data... (Make sure the remote LR900 is connected to a flight controller)");
 
-                    telemetryConnected = true;
-                    telemetryStatus.setText("● Connected");
-                    telemetryStatus.getStyleClass().clear();
-                    telemetryStatus.getStyleClass().add("status-connected");
-                    telemetryConnectBtn.setText("Disconnect");
-                    telemetryConnectBtn.getStyleClass().remove("connect-button");
-                    telemetryConnectBtn.getStyleClass().add("disconnect-button");
-                    telemetryConnectBtn.setDisable(false);
+        // Start requesting data streams after 2 seconds
+        scheduler.schedule(this::requestDataStreams, 2, TimeUnit.SECONDS);
 
-                    // Update display
-                    updateContentDisplay();
+        // Request streams periodically every 5 seconds
+        scheduler.scheduleAtFixedRate(this::requestDataStreams, 2, 5, TimeUnit.SECONDS);
+    }
 
-                    // Start telemetry updates
-                    startTelemetryUpdates();
-                });
+    private void requestDataStreams() {
+        if (!isRunning.get() || mavlinkConnection == null) {
+            return;
+        }
 
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+        log("Requesting telemetry streams from flight controller...");
+
+        try {
+            // Use the modern approach: request specific message intervals
+            // Message IDs for common telemetry
+            int[] messageIds = {
+                    1,    // SYS_STATUS (battery, etc)
+                    24,   // GPS_RAW_INT
+                    30,   // ATTITUDE
+                    33,   // GLOBAL_POSITION_INT
+                    74,   // VFR_HUD
+                    42,   // MISSION_CURRENT
+                    77,   // COMMAND_ACK
+                    147,  // BATTERY_STATUS
+                    241,  // VIBRATION
+                    242   // HOME_POSITION
+            };
+
+            // Request each message at 2Hz (500000 microseconds interval)
+            for (int msgId : messageIds) {
+                CommandLong cmd = CommandLong.builder()
+                        .targetSystem(1)
+                        .targetComponent(1)
+                        .command(MavCmd.MAV_CMD_SET_MESSAGE_INTERVAL)
+                        .confirmation(0)
+                        .param1(msgId)          // Message ID
+                        .param2(500000)         // Interval in microseconds (2Hz = 500000)
+                        .param3(0)
+                        .param4(0)
+                        .param5(0)
+                        .param6(0)
+                        .param7(0)
+                        .build();
+
+                mavlinkConnection.send1(255, 0, cmd);
             }
-        }).start();
+
+            // Alternative: Try requesting a single parameter to trigger streams
+            // Some autopilots start streaming when they receive any parameter request
+            ParamRequestRead paramRequest = ParamRequestRead.builder()
+                    .targetSystem(1)
+                    .targetComponent(1)
+                    .paramId("SYSID_THISMAV")  // A common parameter that should exist
+                    .paramIndex(-1)  // Use parameter ID, not index
+                    .build();
+
+            mavlinkConnection.send1(255, 0, paramRequest);
+
+        } catch (IOException e) {
+            log("Failed to request data streams: " + e.getMessage());
+        }
     }
 
     private void disconnectTelemetry() {
-        telemetryConnected = false;
-        telemetryStatus.setText("● Disconnected");
-        telemetryStatus.getStyleClass().clear();
-        telemetryStatus.getStyleClass().add("status-disconnected");
-        telemetryConnectBtn.setText("Connect");
-        telemetryConnectBtn.getStyleClass().remove("disconnect-button");
-        telemetryConnectBtn.getStyleClass().add("connect-button");
+        isRunning.set(false);
 
-        // Stop telemetry updates
-        stopTelemetryUpdates();
+        if (readThread != null) {
+            try {
+                readThread.join(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
 
-        // Update content display
-        updateContentDisplay();
+        if (serialPort != null && serialPort.isOpen()) {
+            serialPort.closePort();
+        }
+
+        Platform.runLater(() -> {
+            telemetryConnected = false;
+            telemetryStatus.setText("● Disconnected");
+            telemetryStatus.getStyleClass().clear();
+            telemetryStatus.getStyleClass().add("status-disconnected");
+            telemetryConnectBtn.setText("Connect");
+            telemetryConnectBtn.getStyleClass().remove("disconnect-button");
+            telemetryConnectBtn.getStyleClass().add("connect-button");
+            telemetryComboBox.setDisable(false);
+
+            // Update content display
+            updateContentDisplay();
+        });
+
+        log("Disconnected");
+    }
+
+    private void readMavlinkMessages() {
+        log("Starting MAVLink message reader thread...");
+        int timeoutCount = 0;
+        final int MAX_TIMEOUTS = 5;
+
+        while (isRunning.get()) {
+            try {
+                MavlinkMessage<?> message = mavlinkConnection.next();
+                if (message != null) {
+                    timeoutCount = 0; // Reset timeout counter on successful read
+                    handleMavlinkMessage(message);
+                }
+            } catch (IOException e) {
+                if (isRunning.get()) {
+                    String errorMsg = e.getMessage();
+                    if (errorMsg != null && errorMsg.contains("timed out")) {
+                        timeoutCount++;
+                        if (timeoutCount >= MAX_TIMEOUTS) {
+                            Platform.runLater(() -> {
+                                log("No MAVLink data received after " + MAX_TIMEOUTS + " timeouts. Check:");
+                                log("1. Remote LR900 is powered and connected to flight controller");
+                                log("2. Flight controller is sending telemetry data");
+                                log("3. Both LR900 radios are properly paired");
+                                log("4. Correct baud rate (try 57600 or 115200)");
+                                disconnectTelemetry();
+                            });
+                            break;
+                        } else {
+                            int finalTimeoutCount = timeoutCount;
+                            Platform.runLater(() -> log("Timeout " + finalTimeoutCount + "/" + MAX_TIMEOUTS + " - still waiting for data..."));
+                        }
+                    } else {
+                        Platform.runLater(() -> {
+                            log("Read error: " + errorMsg);
+                            disconnectTelemetry();
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        log("MAVLink reader thread stopped");
+    }
+
+    private void handleMavlinkMessage(MavlinkMessage<?> message) {
+        Object payload = message.getPayload();
+
+        Platform.runLater(() -> {
+            if (payload instanceof Heartbeat hb) {
+                String mode = "Mode " + hb.customMode();
+                flightModeLabel.setText(mode);
+
+                boolean armed = (hb.baseMode().value() & 128) != 0;
+                armStatusLabel.setText(armed ? "ARMED" : "DISARMED");
+                armStatusLabel.setStyle(armed ? "-fx-text-fill: #e74c3c;" : "-fx-text-fill: #27ae60;");
+
+            } else if (payload instanceof SysStatus sys) {
+                double voltage = sys.voltageBattery() / 1000.0;
+                int percentage = sys.batteryRemaining();
+                if (percentage == -1) {
+                    batteryLabel.setText(String.format("%.1fV", voltage));
+                } else {
+                    batteryLabel.setText(String.format("%.1fV (%d%%)", voltage, percentage));
+                }
+
+            } else if (payload instanceof GpsRawInt gps) {
+                double lat = gps.lat() / 1e7;
+                double lon = gps.lon() / 1e7;
+                if (gps.fixType().value() >= 2) {  // 2D fix or better
+                    gpsLabel.setText(String.format("%.6f, %.6f", lat, lon));
+                    satellitesLabel.setText(String.valueOf(gps.satellitesVisible()));
+
+                    // Update current position and map
+                    if (lat != 0 && lon != 0) {
+                        currentLat = lat;
+                        currentLon = lon;
+                        hasValidGpsPosition = true;
+
+                        // Update map position
+                        if (mapInitialized) {
+                            updateMapPosition(currentLat, currentLon);
+                        }
+                    }
+                } else {
+                    gpsLabel.setText("No Fix");
+                    satellitesLabel.setText(gps.satellitesVisible() + " (no fix)");
+                }
+
+            } else if (payload instanceof GlobalPositionInt pos) {
+                double alt = pos.relativeAlt() / 1000.0;
+                altitudeLabel.setText(String.format("%.1f m", alt));
+
+                // Also update GPS position from this message if valid
+                if (!hasValidGpsPosition) {
+                    double lat = pos.lat() / 1e7;
+                    double lon = pos.lon() / 1e7;
+                    if (lat != 0 && lon != 0) {
+                        currentLat = lat;
+                        currentLon = lon;
+                        hasValidGpsPosition = true;
+                        gpsLabel.setText(String.format("%.6f, %.6f", lat, lon));
+
+                        // Update map position
+                        if (mapInitialized) {
+                            updateMapPosition(currentLat, currentLon);
+                        }
+                    }
+                }
+
+            } else if (payload instanceof VfrHud hud) {
+                speedLabel.setText(String.format("%.1f m/s", hud.groundspeed()));
+                if (hud.alt() > 0) {  // Use VFR HUD altitude if available
+                    altitudeLabel.setText(String.format("%.1f m", hud.alt()));
+                }
+
+            } else if (payload instanceof Attitude att) {
+                double roll = Math.toDegrees(att.roll());
+                double pitch = Math.toDegrees(att.pitch());
+                double yaw = Math.toDegrees(att.yaw());
+                rollPitchYawLabel.setText(String.format("R:%.0f° P:%.0f° Y:%.0f°", roll, pitch, yaw));
+            }
+
+            // Log the message
+            String msgType = payload.getClass().getSimpleName();
+            log("Received: " + msgType + " from Sys:" + message.getOriginSystemId());
+        });
+    }
+
+    private void log(String message) {
+        String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        System.out.println("[" + timestamp + "] " + message);
+        // TODO: If you have a log text area in your UI, you can also append to it here
     }
 
     private void toggleVideoConnection() {
@@ -503,26 +764,10 @@ public class MainController implements Initializable {
             } catch (Exception e) {
                 e.printStackTrace();
                 Platform.runLater(() -> {
-                    String errorMsg = e.getMessage();
-                    if (errorMsg == null || errorMsg.isEmpty()) {
-                        errorMsg = "Failed to connect to camera";
-                    }
-                    videoStatus.setText("● " + errorMsg);
+                    videoStatus.setText("● Failed to connect to camera");
                     videoStatus.getStyleClass().clear();
                     videoStatus.getStyleClass().add("status-disconnected");
                     videoConnectBtn.setDisable(false);
-
-                    // Show alert to user
-                    javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                            javafx.scene.control.Alert.AlertType.ERROR
-                    );
-                    alert.setTitle("Camera Connection Error");
-                    alert.setHeaderText("Failed to connect to " + selectedSource.getName());
-                    alert.setContentText(errorMsg + "\n\nPlease make sure:\n" +
-                            "1. The camera is connected\n" +
-                            "2. No other application is using the camera\n" +
-                            "3. You have permission to access the camera");
-                    alert.showAndWait();
                 });
             }
         }).start();
@@ -626,76 +871,9 @@ public class MainController implements Initializable {
         mapPlaceholder.setManaged(true);
     }
 
-    private void startTelemetryUpdates() {
-        telemetryTimer = new Timer(true);
-        telemetryTimer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                Platform.runLater(() -> updateTelemetryData());
-            }
-        }, 0, 100); // Update every 100ms
-    }
-
-    private void stopTelemetryUpdates() {
-        if (telemetryTimer != null) {
-            telemetryTimer.cancel();
-            telemetryTimer = null;
-        }
-    }
-
-    private void updateTelemetryData() {
-        // TODO: Get actual telemetry data from your telemetry source
-        // For now, using simulated data
-
-        // Simulate battery voltage (11.0V - 12.6V)
-        double voltage = 11.0 + Math.random() * 1.6;
-        int batteryPercent = (int)((voltage - 11.0) / 1.6 * 100);
-        batteryLabel.setText(String.format("%.1fV (%d%%)", voltage, batteryPercent));
-
-        // Simulate GPS coordinates with slight movement
-        currentLat = currentLat + (Math.random() - 0.5) * 0.0001;
-        currentLon = currentLon + (Math.random() - 0.5) * 0.0001;
-        gpsLabel.setText(String.format("%.6f, %.6f", currentLat, currentLon));
-
-        // Update map position
-        if (mapInitialized) {
-            updateMapPosition(currentLat, currentLon);
-        }
-
-        // Simulate altitude (0 - 500m)
-        double altitude = Math.random() * 500;
-        altitudeLabel.setText(String.format("%.1f m", altitude));
-
-        // Simulate speed (0 - 50 m/s)
-        double speed = Math.random() * 50;
-        speedLabel.setText(String.format("%.1f m/s", speed));
-
-        // Simulate arm status
-        armStatusLabel.setText(Math.random() > 0.5 ? "ARMED" : "DISARMED");
-        if ("ARMED".equals(armStatusLabel.getText())) {
-            armStatusLabel.setStyle("-fx-text-fill: #27ae60;");
-        } else {
-            armStatusLabel.setStyle("-fx-text-fill: #e74c3c;");
-        }
-
-        // Simulate flight mode
-        String[] modes = {"STABILIZE", "LOITER", "AUTO", "RTL", "LAND"};
-        flightModeLabel.setText(modes[(int)(Math.random() * modes.length)]);
-
-        // Simulate satellite count
-        satellitesLabel.setText(String.valueOf(8 + (int)(Math.random() * 8)));
-
-        // Simulate attitude
-        double roll = (Math.random() - 0.5) * 60;
-        double pitch = (Math.random() - 0.5) * 60;
-        double yaw = Math.random() * 360;
-        rollPitchYawLabel.setText(String.format("R:%.0f° P:%.0f° Y:%.0f°", roll, pitch, yaw));
-    }
-
     private void updateMapPosition(double lat, double lon) {
         if (webEngine != null && mapInitialized) {
             try {
-                pathPoints.add(new double[]{lat, lon});
                 String script = String.format("updatePosition(%f, %f)", lat, lon);
                 webEngine.executeScript(script);
             } catch (Exception e) {
@@ -705,7 +883,6 @@ public class MainController implements Initializable {
     }
 
     private void clearPath() {
-        pathPoints.clear();
         if (webEngine != null && mapInitialized) {
             try {
                 webEngine.executeScript("clearPath()");
@@ -725,11 +902,32 @@ public class MainController implements Initializable {
         }
     }
 
+    private void showAlert(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
     public void shutdown() {
-        stopTelemetryUpdates();
+        scheduler.shutdownNow();
+        isRunning.set(false);
+
+        if (readThread != null) {
+            try {
+                readThread.join(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        if (serialPort != null && serialPort.isOpen()) {
+            serialPort.closePort();
+        }
+
         if (videoCapture != null) {
             videoCapture.stopCapture();
         }
-        // TODO: Clean up any other resources
     }
 }

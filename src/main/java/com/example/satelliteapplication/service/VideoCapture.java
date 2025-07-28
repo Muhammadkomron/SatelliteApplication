@@ -1,8 +1,6 @@
 package com.example.satelliteapplication.service;
 
 import org.bytedeco.javacv.*;
-import org.bytedeco.opencv.global.opencv_imgcodecs;
-import org.bytedeco.opencv.opencv_core.Mat;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
@@ -15,9 +13,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class VideoCapture {
     private FrameGrabber grabber;
-    private Java2DFrameConverter converter;
+    private final Java2DFrameConverter converter;
     private Thread captureThread;
-    private AtomicBoolean isCapturing;
+    private final AtomicBoolean isCapturing;
     private ImageView targetImageView;
 
     public VideoCapture() {
@@ -85,8 +83,7 @@ public class VideoCapture {
         }
 
         // Configure grabber
-        if (grabber instanceof OpenCVFrameGrabber) {
-            OpenCVFrameGrabber cvGrabber = (OpenCVFrameGrabber) grabber;
+        if (grabber instanceof OpenCVFrameGrabber cvGrabber) {
             cvGrabber.setImageWidth(640);
             cvGrabber.setImageHeight(480);
             cvGrabber.setFrameRate(30);
@@ -162,9 +159,9 @@ public class VideoCapture {
      * Video source representation
      */
     public static class VideoSource {
-        private String name;
-        private Object source;
-        private VideoSourceType type;
+        private final String name;
+        private final Object source;
+        private final VideoSourceType type;
 
         public VideoSource(String name, Object source, VideoSourceType type) {
             this.name = name;

@@ -53,7 +53,7 @@
                                           <Tooltip text="Refresh telemetry sources" />
                                        </tooltip>
                                     </Button>
-                                    <Button fx:id="telemetryConnectBtn" mnemonicParsing="false" styleClass="connect-button" text="Connect">
+                                    <Button fx:id="telemetryConnectBtn" mnemonicParsing="false" prefWidth="120.0" styleClass="connect-button" text="Connect">
                                        <tooltip>
                                           <Tooltip text="Connect to telemetry source" />
                                        </tooltip>
@@ -90,7 +90,7 @@
                                           <Tooltip text="Refresh video sources" />
                                        </tooltip>
                                     </Button>
-                                    <Button fx:id="videoConnectBtn" mnemonicParsing="false" styleClass="connect-button" text="Connect">
+                                    <Button fx:id="videoConnectBtn" mnemonicParsing="false" prefWidth="120.0" styleClass="connect-button" text="Connect">
                                        <tooltip>
                                           <Tooltip text="Connect to video source" />
                                        </tooltip>
