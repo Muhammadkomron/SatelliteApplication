@@ -85,6 +85,7 @@ public class MainController implements Initializable {
     private ImageView videoImageView;
     private Stage videoStage;
     private ImageView externalVideoImageView;
+    private boolean isExternalVideoMode = false;
 
     // Map Display
     @FXML private VBox mapPanel;
@@ -153,7 +154,7 @@ public class MainController implements Initializable {
         telemetryConnectBtn.setOnAction(e -> toggleTelemetryConnection());
         videoRefreshBtn.setOnAction(e -> refreshVideoSources());
         videoConnectBtn.setOnAction(e -> toggleVideoConnection());
-        videoExpandBtn.setOnAction(e -> expandVideoToNewWindow());
+        videoExpandBtn.setOnAction(e -> toggleExternalVideo());
         clearPathBtn.setOnAction(e -> clearPath());
         centerMapBtn.setOnAction(e -> centerMap());
 
@@ -173,6 +174,14 @@ public class MainController implements Initializable {
 
         // Initialize new telemetry fields with default values
         initializeTelemetryFields();
+    }
+
+    private void toggleExternalVideo() {
+        if (!isExternalVideoMode) {
+            expandVideoToNewWindow();
+        } else {
+            closeExternalVideo();
+        }
     }
 
     private void expandVideoToNewWindow() {
@@ -220,22 +229,49 @@ public class MainController implements Initializable {
         externalVideoImageView.fitWidthProperty().bind(videoPane.widthProperty());
         externalVideoImageView.fitHeightProperty().bind(videoPane.heightProperty());
 
-        // Update video capture to use both image views
+        // Update video capture to use external image view instead of primary
         videoCapture.setExternalImageView(externalVideoImageView);
+        videoCapture.setPrimaryImageView(null); // Disable primary view
+
+        // Hide video in main window
+        videoContainer.getChildren().clear();
+        Label externalModeLabel = new Label("Video is displayed in external window");
+        externalModeLabel.getStyleClass().add("info-label");
+        videoContainer.getChildren().add(externalModeLabel);
 
         // Handle stage close
         videoStage.setOnCloseRequest(event -> {
-            videoCapture.setExternalImageView(null);
-            externalVideoImageView = null;
-            videoStage = null;
-            videoExpandBtn.setText("Expand Video");
+            event.consume(); // Prevent default close
+            closeExternalVideo();
         });
 
         // Show the stage
         videoStage.show();
 
-        // Update button text
+        // Update button text and state
         videoExpandBtn.setText("Close External");
+        isExternalVideoMode = true;
+    }
+
+    private void closeExternalVideo() {
+        if (videoStage != null) {
+            // Re-enable primary view before closing
+            videoCapture.setPrimaryImageView(videoImageView);
+            videoCapture.setExternalImageView(null);
+
+            // Close the stage
+            videoStage.close();
+            videoStage = null;
+            externalVideoImageView = null;
+
+            // Restore video in main window
+            videoContainer.getChildren().clear();
+            videoContainer.getChildren().add(videoImageView);
+
+            // Update button text and state
+            videoExpandBtn.setText("Expand Video");
+            isExternalVideoMode = false;
+        }
     }
 
     private void initializeTelemetryFields() {
@@ -1009,11 +1045,7 @@ public class MainController implements Initializable {
 
     private void disconnectVideo() {
         // Close external window if open
-        if (videoStage != null) {
-            videoStage.close();
-            videoStage = null;
-            externalVideoImageView = null;
-        }
+        closeExternalVideo();
 
         videoCapture.stopCapture();
 
@@ -1177,8 +1209,6 @@ public class MainController implements Initializable {
         }
 
         // Close external video window if open
-        if (videoStage != null) {
-            videoStage.close();
-        }
+        closeExternalVideo();
     }
 }

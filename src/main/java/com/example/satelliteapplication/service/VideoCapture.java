@@ -16,8 +16,8 @@ public class VideoCapture {
     private FrameGrabber grabber;
     private Thread captureThread;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
-    private ImageView primaryImageView;
-    private ImageView externalImageView;
+    private volatile ImageView primaryImageView;
+    private volatile ImageView externalImageView;
     private final Java2DFrameConverter converter = new Java2DFrameConverter();
 
     public enum VideoSourceType {
@@ -85,14 +85,16 @@ public class VideoCapture {
                                 Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
 
                                 Platform.runLater(() -> {
-                                    // Update primary display
-                                    if (primaryImageView != null) {
-                                        primaryImageView.setImage(fxImage);
+                                    // Update primary display if set
+                                    ImageView primary = primaryImageView;
+                                    if (primary != null) {
+                                        primary.setImage(fxImage);
                                     }
 
                                     // Update external display if available
-                                    if (externalImageView != null) {
-                                        externalImageView.setImage(fxImage);
+                                    ImageView external = externalImageView;
+                                    if (external != null) {
+                                        external.setImage(fxImage);
                                     }
                                 });
                             }
@@ -136,6 +138,10 @@ public class VideoCapture {
 
         primaryImageView = null;
         externalImageView = null;
+    }
+
+    public void setPrimaryImageView(ImageView imageView) {
+        this.primaryImageView = imageView;
     }
 
     public void setExternalImageView(ImageView imageView) {
