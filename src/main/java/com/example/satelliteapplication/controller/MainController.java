@@ -6,12 +6,16 @@ import javafx.collections.ObservableList;
 import javafx.concurrent.Worker;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
+import javafx.stage.Stage;
+import javafx.stage.Screen;
+import javafx.geometry.Rectangle2D;
 
 import com.example.satelliteapplication.service.VideoCapture;
 import com.example.satelliteapplication.service.VideoCapture.VideoSource;
@@ -24,6 +28,7 @@ import io.dronefleet.mavlink.minimal.Heartbeat;
 
 import java.io.IOException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -43,10 +48,11 @@ public class MainController implements Initializable {
     @FXML private Button telemetryConnectBtn;
     @FXML private Button videoRefreshBtn;
     @FXML private Button videoConnectBtn;
+    @FXML private Button videoExpandBtn;
     @FXML private Label telemetryStatus;
     @FXML private Label videoStatus;
 
-    // Telemetry Display
+    // Telemetry Display - Existing fields
     @FXML private VBox telemetryPanel;
     @FXML private VBox telemetryPlaceholder;
     @FXML private Label batteryLabel;
@@ -58,11 +64,27 @@ public class MainController implements Initializable {
     @FXML private Label satellitesLabel;
     @FXML private Label rollPitchYawLabel;
 
+    // New telemetry fields
+    @FXML private Label missionTimeLabel;
+    @FXML private Label pressureLabel;
+    @FXML private Label verticalVelocityLabel;
+    @FXML private Label distanceLabel;
+    @FXML private Label internalTempLabel;
+    @FXML private Label externalTempLabel;
+    @FXML private Label gpsAltitudeLabel;
+    @FXML private Label pitchLabel;
+    @FXML private Label rollLabel;
+    @FXML private Label yawLabel;
+    @FXML private Label messageLabel;
+    @FXML private Label teamIdLabel;
+
     // Video Display
     @FXML private VBox videoPanel;
     @FXML private VBox videoPlaceholder;
     @FXML private StackPane videoContainer;
     private ImageView videoImageView;
+    private Stage videoStage;
+    private ImageView externalVideoImageView;
 
     // Map Display
     @FXML private VBox mapPanel;
@@ -91,6 +113,13 @@ public class MainController implements Initializable {
     private double currentLon = 69.2401;
     private boolean mapInitialized = false;
     private boolean hasValidGpsPosition = false;
+
+    // Mission data
+    private LocalDateTime missionStartTime;
+    private double homeLatitude = 0;
+    private double homeLongitude = 0;
+    private boolean homePositionSet = false;
+    private static final String TEAM_ID = "001"; // Set your team ID here
 
     // Helper class for serial port display
     private static class SerialPortInfo {
@@ -124,8 +153,13 @@ public class MainController implements Initializable {
         telemetryConnectBtn.setOnAction(e -> toggleTelemetryConnection());
         videoRefreshBtn.setOnAction(e -> refreshVideoSources());
         videoConnectBtn.setOnAction(e -> toggleVideoConnection());
+        videoExpandBtn.setOnAction(e -> expandVideoToNewWindow());
         clearPathBtn.setOnAction(e -> clearPath());
         centerMapBtn.setOnAction(e -> centerMap());
+
+        // Initially hide expand button
+        videoExpandBtn.setVisible(false);
+        videoExpandBtn.setManaged(false);
 
         // Initialize combo boxes
         refreshTelemetrySources();
@@ -136,6 +170,113 @@ public class MainController implements Initializable {
 
         // Initially show placeholders
         showAllPlaceholders();
+
+        // Initialize new telemetry fields with default values
+        initializeTelemetryFields();
+    }
+
+    private void expandVideoToNewWindow() {
+        if (!videoConnected || videoStage != null) {
+            return;
+        }
+
+        // Create external video ImageView
+        externalVideoImageView = new ImageView();
+        externalVideoImageView.setPreserveRatio(true);
+
+        // Create StackPane to hold the video
+        StackPane videoPane = new StackPane(externalVideoImageView);
+        videoPane.setStyle("-fx-background-color: black;");
+
+        // Create new stage
+        videoStage = new Stage();
+        videoStage.setTitle("NazarX Video Feed - External Display");
+
+        // Get screen information
+        List<Screen> screens = Screen.getScreens();
+
+        // Create scene
+        Scene scene = new Scene(videoPane, 1280, 720);
+        scene.getStylesheets().add(getClass().getResource("/css/application.css").toExternalForm());
+        videoStage.setScene(scene);
+
+        // If there are multiple monitors, show on the second one
+        if (screens.size() > 1) {
+            Screen secondScreen = screens.get(1);
+            Rectangle2D bounds = secondScreen.getVisualBounds();
+
+            videoStage.setX(bounds.getMinX());
+            videoStage.setY(bounds.getMinY());
+            videoStage.setWidth(bounds.getWidth());
+            videoStage.setHeight(bounds.getHeight());
+            videoStage.setMaximized(true);
+        } else {
+            // Single monitor - position to the right
+            videoStage.setX(Screen.getPrimary().getVisualBounds().getWidth() / 2);
+            videoStage.setY(0);
+        }
+
+        // Bind video size to stage size
+        externalVideoImageView.fitWidthProperty().bind(videoPane.widthProperty());
+        externalVideoImageView.fitHeightProperty().bind(videoPane.heightProperty());
+
+        // Update video capture to use both image views
+        videoCapture.setExternalImageView(externalVideoImageView);
+
+        // Handle stage close
+        videoStage.setOnCloseRequest(event -> {
+            videoCapture.setExternalImageView(null);
+            externalVideoImageView = null;
+            videoStage = null;
+            videoExpandBtn.setText("Expand Video");
+        });
+
+        // Show the stage
+        videoStage.show();
+
+        // Update button text
+        videoExpandBtn.setText("Close External");
+    }
+
+    private void initializeTelemetryFields() {
+        // Set initial values for new fields
+        missionTimeLabel.setText("00:00:00");
+        pressureLabel.setText("0.0 hPa");
+        verticalVelocityLabel.setText("0.0 m/s");
+        distanceLabel.setText("0.0 m");
+        internalTempLabel.setText("0.0°C");
+        externalTempLabel.setText("0.0°C");
+        gpsAltitudeLabel.setText("0.0 m");
+        pitchLabel.setText("0.0°");
+        rollLabel.setText("0.0°");
+        yawLabel.setText("0.0°");
+        messageLabel.setText("No message");
+        teamIdLabel.setText("Team: " + TEAM_ID);
+    }
+
+    private void updateMissionTime() {
+        if (missionStartTime != null) {
+            LocalDateTime now = LocalDateTime.now();
+            long seconds = java.time.Duration.between(missionStartTime, now).getSeconds();
+            long hours = seconds / 3600;
+            long minutes = (seconds % 3600) / 60;
+            long secs = seconds % 60;
+
+            String timeString = String.format("%02d:%02d:%02d", hours, minutes, secs);
+            Platform.runLater(() -> missionTimeLabel.setText(timeString));
+        }
+    }
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        // Haversine formula to calculate distance between two GPS coordinates
+        final double R = 6371000; // Earth's radius in meters
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
     }
 
     private void initializeMap() {
@@ -453,6 +594,12 @@ public class MainController implements Initializable {
 
         isRunning.set(true);
 
+        // Initialize mission start time
+        missionStartTime = LocalDateTime.now();
+
+        // Start mission time updater
+        scheduler.scheduleAtFixedRate(this::updateMissionTime, 0, 1, TimeUnit.SECONDS);
+
         // Start reading thread
         readThread = new Thread(this::readMavlinkMessages);
         readThread.setDaemon(true);
@@ -503,7 +650,11 @@ public class MainController implements Initializable {
                     77,   // COMMAND_ACK
                     147,  // BATTERY_STATUS
                     241,  // VIBRATION
-                    242   // HOME_POSITION
+                    242,  // HOME_POSITION
+                    29,   // SCALED_PRESSURE
+                    105,  // HIGHRES_IMU
+                    141,  // ALTITUDE
+                    253   // STATUSTEXT (if available)
             };
 
             // Request each message at 2Hz (500000 microseconds interval)
@@ -641,15 +792,30 @@ public class MainController implements Initializable {
             } else if (payload instanceof GpsRawInt gps) {
                 double lat = gps.lat() / 1e7;
                 double lon = gps.lon() / 1e7;
+                double gpsAlt = gps.alt() / 1000.0; // Convert from mm to m
+
                 if (gps.fixType().value() >= 2) {  // 2D fix or better
                     gpsLabel.setText(String.format("%.6f, %.6f", lat, lon));
                     satellitesLabel.setText(String.valueOf(gps.satellitesVisible()));
+                    gpsAltitudeLabel.setText(String.format("%.1f m", gpsAlt));
 
                     // Update current position and map
                     if (lat != 0 && lon != 0) {
                         currentLat = lat;
                         currentLon = lon;
                         hasValidGpsPosition = true;
+
+                        // Set home position on first valid GPS fix
+                        if (!homePositionSet) {
+                            homeLatitude = lat;
+                            homeLongitude = lon;
+                            homePositionSet = true;
+                            log("Home position set: " + homeLatitude + ", " + homeLongitude);
+                        }
+
+                        // Calculate distance from home
+                        double distance = calculateDistance(homeLatitude, homeLongitude, lat, lon);
+                        distanceLabel.setText(String.format("%.1f m", distance));
 
                         // Update map position
                         if (mapInitialized) {
@@ -659,11 +825,16 @@ public class MainController implements Initializable {
                 } else {
                     gpsLabel.setText("No Fix");
                     satellitesLabel.setText(gps.satellitesVisible() + " (no fix)");
+                    gpsAltitudeLabel.setText("No GPS");
                 }
 
             } else if (payload instanceof GlobalPositionInt pos) {
                 double alt = pos.relativeAlt() / 1000.0;
                 altitudeLabel.setText(String.format("%.1f m", alt));
+
+                // Calculate vertical velocity from vz (cm/s to m/s)
+                double verticalVel = pos.vz() / 100.0;
+                verticalVelocityLabel.setText(String.format("%.2f m/s", verticalVel));
 
                 // Also update GPS position from this message if valid
                 if (!hasValidGpsPosition) {
@@ -688,11 +859,70 @@ public class MainController implements Initializable {
                     altitudeLabel.setText(String.format("%.1f m", hud.alt()));
                 }
 
+                // Vertical speed from climb rate
+                verticalVelocityLabel.setText(String.format("%.2f m/s", hud.climb()));
+
             } else if (payload instanceof Attitude att) {
                 double roll = Math.toDegrees(att.roll());
                 double pitch = Math.toDegrees(att.pitch());
                 double yaw = Math.toDegrees(att.yaw());
+
+                // Update combined display
                 rollPitchYawLabel.setText(String.format("R:%.0f° P:%.0f° Y:%.0f°", roll, pitch, yaw));
+
+                // Update individual displays
+                rollLabel.setText(String.format("%.1f°", roll));
+                pitchLabel.setText(String.format("%.1f°", pitch));
+                yawLabel.setText(String.format("%.1f°", yaw));
+
+            } else if (payload instanceof ScaledPressure pressure) {
+                // Pressure in hPa
+                pressureLabel.setText(String.format("%.1f hPa", pressure.pressAbs()));
+
+                // Temperature in Celsius
+                double temp = pressure.temperature() / 100.0;
+                externalTempLabel.setText(String.format("%.1f°C", temp));
+
+            } else if (payload instanceof ScaledImu2 imu2) {
+                // Alternative temperature source (internal IMU temperature)
+                // Temperature is in centi-degrees
+                double temp = imu2.temperature() / 100.0;
+                internalTempLabel.setText(String.format("%.1f°C", temp));
+
+            } else if (payload instanceof HighresImu highres) {
+                // High resolution IMU data - alternative temperature source
+                // Some autopilots provide temperature here
+                double temp = highres.temperature();
+                if (temp != 0) {  // Only update if valid
+                    internalTempLabel.setText(String.format("%.1f°C", temp));
+                }
+            }
+
+            // Try to handle STATUSTEXT message dynamically
+            // Check if the payload class name contains "statustext" (case insensitive)
+            String className = payload.getClass().getSimpleName().toLowerCase();
+            if (className.contains("statustext")) {
+                try {
+                    // Use reflection to get the text field
+                    java.lang.reflect.Method textMethod = payload.getClass().getMethod("text");
+                    Object textObj = textMethod.invoke(payload);
+
+                    if (textObj instanceof byte[]) {
+                        String text = new String((byte[]) textObj).replace("\0", "").trim();
+                        if (!text.isEmpty()) {
+                            messageLabel.setText(text.substring(0, Math.min(text.length(), 10)));
+                            log("Status message: " + text);
+                        }
+                    } else if (textObj instanceof String) {
+                        String text = ((String) textObj).trim();
+                        if (!text.isEmpty()) {
+                            messageLabel.setText(text.substring(0, Math.min(text.length(), 10)));
+                            log("Status message: " + text);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore if method not found or other reflection errors
+                }
             }
 
             // Log the message
@@ -744,6 +974,10 @@ public class MainController implements Initializable {
                         videoConnectBtn.getStyleClass().add("disconnect-button");
                         videoConnectBtn.setDisable(false);
 
+                        // Show expand button
+                        videoExpandBtn.setVisible(true);
+                        videoExpandBtn.setManaged(true);
+
                         // Clear existing content and add video view
                         videoContainer.getChildren().clear();
                         videoContainer.getChildren().add(videoImageView);
@@ -774,6 +1008,13 @@ public class MainController implements Initializable {
     }
 
     private void disconnectVideo() {
+        // Close external window if open
+        if (videoStage != null) {
+            videoStage.close();
+            videoStage = null;
+            externalVideoImageView = null;
+        }
+
         videoCapture.stopCapture();
 
         videoConnected = false;
@@ -783,6 +1024,11 @@ public class MainController implements Initializable {
         videoConnectBtn.setText("Connect");
         videoConnectBtn.getStyleClass().remove("disconnect-button");
         videoConnectBtn.getStyleClass().add("connect-button");
+
+        // Hide expand button
+        videoExpandBtn.setVisible(false);
+        videoExpandBtn.setManaged(false);
+        videoExpandBtn.setText("Expand Video");
 
         // Clear video container
         videoContainer.getChildren().clear();
@@ -928,6 +1174,11 @@ public class MainController implements Initializable {
 
         if (videoCapture != null) {
             videoCapture.stopCapture();
+        }
+
+        // Close external video window if open
+        if (videoStage != null) {
+            videoStage.close();
         }
     }
 }

@@ -1,163 +1,30 @@
 package com.example.satelliteapplication.service;
 
-import org.bytedeco.javacv.*;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.FrameGrabber;
+import org.bytedeco.javacv.Java2DFrameConverter;
+import org.bytedeco.javacv.OpenCVFrameGrabber;
 
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class VideoCapture {
     private FrameGrabber grabber;
-    private final Java2DFrameConverter converter;
     private Thread captureThread;
-    private final AtomicBoolean isCapturing;
-    private ImageView targetImageView;
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private ImageView primaryImageView;
+    private ImageView externalImageView;
+    private final Java2DFrameConverter converter = new Java2DFrameConverter();
 
-    public VideoCapture() {
-        this.converter = new Java2DFrameConverter();
-        this.isCapturing = new AtomicBoolean(false);
+    public enum VideoSourceType {
+        USB_CAMERA,
+        NETWORK_STREAM
     }
 
-    /**
-     * Get available video sources (USB cameras and webcams)
-     */
-    public static List<VideoSource> getAvailableVideoSources() {
-        List<VideoSource> sources = new ArrayList<>();
-
-        // Check for available cameras (0-5 typical range)
-        for (int i = 0; i < 6; i++) {
-            try {
-                OpenCVFrameGrabber testGrabber = new OpenCVFrameGrabber(i);
-                testGrabber.start();
-
-                // If we can start it, it exists
-                String name = "Camera " + i;
-                if (i == 0) {
-                    name = "Built-in Webcam";
-                } else {
-                    name = "USB Camera " + i;
-                }
-
-                sources.add(new VideoSource(name, i, VideoSourceType.USB_CAMERA));
-                testGrabber.stop();
-                testGrabber.release();
-
-            } catch (Exception e) {
-                // Camera index doesn't exist, continue checking
-            }
-        }
-
-        // Add network sources as examples (not implemented)
-        sources.add(new VideoSource("UDP - 5600", "udp://0.0.0.0:5600", VideoSourceType.NETWORK));
-        sources.add(new VideoSource("RTSP - rtsp://192.168.1.100:8554", "rtsp://192.168.1.100:8554", VideoSourceType.NETWORK));
-
-        return sources;
-    }
-
-    /**
-     * Start video capture from the specified source
-     */
-    public void startCapture(VideoSource source, ImageView imageView) throws FrameGrabber.Exception {
-        if (isCapturing.get()) {
-            stopCapture();
-        }
-
-        this.targetImageView = imageView;
-
-        // Create appropriate grabber based on source type
-        switch (source.getType()) {
-            case USB_CAMERA:
-                grabber = new OpenCVFrameGrabber((Integer) source.getSource());
-                break;
-            case NETWORK:
-                // For network sources, you would use FFmpegFrameGrabber
-                grabber = new FFmpegFrameGrabber((String) source.getSource());
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported video source type");
-        }
-
-        // Configure grabber
-        if (grabber instanceof OpenCVFrameGrabber cvGrabber) {
-            cvGrabber.setImageWidth(640);
-            cvGrabber.setImageHeight(480);
-            cvGrabber.setFrameRate(30);
-        }
-
-        grabber.start();
-        isCapturing.set(true);
-
-        // Start capture thread
-        captureThread = new Thread(() -> {
-            try {
-                while (isCapturing.get()) {
-                    Frame frame = grabber.grab();
-                    if (frame != null && frame.image != null) {
-                        BufferedImage bufferedImage = converter.convert(frame);
-                        if (bufferedImage != null) {
-                            Platform.runLater(() -> {
-                                Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
-                                targetImageView.setImage(fxImage);
-                            });
-                        }
-                    }
-
-                    // Control frame rate
-                    Thread.sleep(33); // ~30 FPS
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                Platform.runLater(() -> {
-                    // Handle error in UI
-                    System.err.println("Video capture error: " + e.getMessage());
-                });
-            }
-        });
-
-        captureThread.setDaemon(true);
-        captureThread.start();
-    }
-
-    /**
-     * Stop video capture
-     */
-    public void stopCapture() {
-        isCapturing.set(false);
-
-        if (captureThread != null) {
-            try {
-                captureThread.join(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        if (grabber != null) {
-            try {
-                grabber.stop();
-                grabber.release();
-            } catch (FrameGrabber.Exception e) {
-                e.printStackTrace();
-            }
-            grabber = null;
-        }
-    }
-
-    /**
-     * Check if currently capturing
-     */
-    public boolean isCapturing() {
-        return isCapturing.get();
-    }
-
-    /**
-     * Video source representation
-     */
     public static class VideoSource {
         private final String name;
         private final Object source;
@@ -187,11 +54,95 @@ public class VideoCapture {
         }
     }
 
-    /**
-     * Video source types
-     */
-    public enum VideoSourceType {
-        USB_CAMERA,
-        NETWORK
+    public void startCapture(VideoSource source, ImageView imageView) {
+        if (isRunning.get()) {
+            stopCapture();
+        }
+
+        this.primaryImageView = imageView;
+        isRunning.set(true);
+
+        captureThread = new Thread(() -> {
+            try {
+                if (source.getType() == VideoSourceType.USB_CAMERA) {
+                    int deviceIndex = (Integer) source.getSource();
+                    grabber = new OpenCVFrameGrabber(deviceIndex);
+
+                    // Set capture parameters
+                    grabber.setImageWidth(1280);
+                    grabber.setImageHeight(720);
+                    grabber.setFrameRate(30);
+
+                    grabber.start();
+
+                    System.out.println("Started capturing from: " + source.getName());
+
+                    while (isRunning.get()) {
+                        Frame frame = grabber.grab();
+                        if (frame != null && frame.image != null) {
+                            BufferedImage bufferedImage = converter.convert(frame);
+                            if (bufferedImage != null) {
+                                Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
+
+                                Platform.runLater(() -> {
+                                    // Update primary display
+                                    if (primaryImageView != null) {
+                                        primaryImageView.setImage(fxImage);
+                                    }
+
+                                    // Update external display if available
+                                    if (externalImageView != null) {
+                                        externalImageView.setImage(fxImage);
+                                    }
+                                });
+                            }
+                        }
+
+                        // Small delay to control frame rate
+                        Thread.sleep(33); // ~30 FPS
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    System.err.println("Error capturing video: " + e.getMessage());
+                });
+            } finally {
+                try {
+                    if (grabber != null) {
+                        grabber.stop();
+                        grabber.release();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        captureThread.setDaemon(true);
+        captureThread.start();
+    }
+
+    public void stopCapture() {
+        isRunning.set(false);
+
+        if (captureThread != null) {
+            try {
+                captureThread.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        primaryImageView = null;
+        externalImageView = null;
+    }
+
+    public void setExternalImageView(ImageView imageView) {
+        this.externalImageView = imageView;
+    }
+
+    public boolean isRunning() {
+        return isRunning.get();
     }
 }
