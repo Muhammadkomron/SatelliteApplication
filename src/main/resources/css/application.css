@@ -45,7 +45,6 @@
 }
 
 /* Combo box */
-/* Combo box */
 .combo-box {
     -fx-background-color: transparent;
     -fx-border-color: #bdc3c7;
@@ -61,15 +60,19 @@
 }
 
 .combo-box:hover {
-    -fx-background-color: transparent;
-    -fx-border-color: #95a5a6;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 8, 0, 0, 2);
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #3498db;
+    -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.2), 8, 0, 0, 1);
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
 }
 
-.combo-box:focused {
-    -fx-background-color: transparent;
-    -fx-border-color: #3498db;
-    -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.25), 10, 0, 0, 1);
+.combo-box:pressed {
+    -fx-background-color: #e9ecef;
+    -fx-border-color: #2980b9;
+    -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.1), 4, 0, 0, 0);
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
 }
 
 /* Arrow button container - keep same background on all states */
@@ -101,10 +104,6 @@
 
 .combo-box:hover .arrow {
     -fx-background-color: #34495e;  /* Arrow still changes color on hover */
-}
-
-.combo-box:focused .arrow {
-    -fx-background-color: #3498db;  /* Arrow changes to blue when focused */
 }
 
 /* Combo box */

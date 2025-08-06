@@ -22,6 +22,7 @@ public class VideoCapture {
     private volatile ImageView primaryImageView;
     private volatile ImageView externalImageView;
     private final Java2DFrameConverter converter = new Java2DFrameConverter();
+    private VideoSource currentSource;
 
     // Performance optimization
     private BufferedImage reusableBufferedImage;
@@ -62,52 +63,72 @@ public class VideoCapture {
         }
     }
 
-    public void startCapture(VideoSource source, ImageView imageView) {
+    public void startCapture(VideoSource source, ImageView imageView) throws Exception {
         if (isRunning.get()) {
             stopCapture();
         }
 
         this.primaryImageView = imageView;
-        isRunning.set(true);
+        this.currentSource = source;
 
-        try {
-            if (source.getType() == VideoSourceType.USB_CAMERA) {
-                int deviceIndex = (Integer) source.getSource();
+        if (source.getType() == VideoSourceType.USB_CAMERA) {
+            int deviceIndex = (Integer) source.getSource();
+
+            // Try to open the camera
+            grabber = new OpenCVFrameGrabber(deviceIndex);
+            grabber.setImageWidth(1280);
+            grabber.setImageHeight(720);
+            grabber.setFrameRate(30);
+
+            try {
+                // Try MJPEG first for better performance
+                grabber.setFormat("mjpeg");
+                grabber.start();
+
+                // Test if we can grab a frame
+                Frame testFrame = grabber.grab();
+                if (testFrame == null || testFrame.image == null) {
+                    throw new Exception("Camera " + deviceIndex + " is not available");
+                }
+            } catch (FrameGrabber.Exception e) {
+                // If MJPEG fails, try without format specification
+                try {
+                    grabber.stop();
+                } catch (Exception ignored) {}
+
                 grabber = new OpenCVFrameGrabber(deviceIndex);
-
-                // Optimize capture settings for performance
                 grabber.setImageWidth(1280);
                 grabber.setImageHeight(720);
                 grabber.setFrameRate(30);
-
-                // Set format for better performance
-                grabber.setFormat("mjpeg"); // Use MJPEG if available
-
                 grabber.start();
 
-                System.out.println("Started capturing from: " + source.getName());
-
-                // Use scheduled executor for consistent frame rate
-                executor = Executors.newSingleThreadScheduledExecutor(r -> {
-                    Thread t = new Thread(r, "VideoCapture");
-                    t.setDaemon(true);
-                    t.setPriority(Thread.MAX_PRIORITY);
-                    return t;
-                });
-
-                executor.scheduleAtFixedRate(this::captureFrame, 0, FRAME_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                // Test again
+                Frame testFrame = grabber.grab();
+                if (testFrame == null || testFrame.image == null) {
+                    throw new Exception("Camera " + deviceIndex + " is not available");
+                }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            stopCapture();
-            Platform.runLater(() -> {
-                System.err.println("Error starting video capture: " + e.getMessage());
+
+            isRunning.set(true);
+            System.out.println("Started capturing from: " + source.getName());
+
+            // Start capture thread
+            executor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "VideoCapture");
+                t.setDaemon(true);
+                t.setPriority(Thread.MAX_PRIORITY);
+                return t;
             });
+
+            executor.scheduleAtFixedRate(this::captureFrame, 0, FRAME_INTERVAL_MS, TimeUnit.MILLISECONDS);
+
+        } else {
+            throw new Exception("Network sources not yet implemented");
         }
     }
 
     private void captureFrame() {
-        if (!isRunning.get()) {
+        if (!isRunning.get() || grabber == null) {
             return;
         }
 
@@ -121,7 +142,7 @@ public class VideoCapture {
 
             Frame frame = grabber.grab();
             if (frame != null && frame.image != null) {
-                // Reuse BufferedImage for better performance
+                // Convert to BufferedImage
                 BufferedImage bufferedImage = converter.getBufferedImage(frame);
                 if (bufferedImage != null) {
                     reusableBufferedImage = bufferedImage;
@@ -145,7 +166,7 @@ public class VideoCapture {
             }
         } catch (Exception e) {
             if (isRunning.get()) {
-                e.printStackTrace();
+                System.err.println("Frame capture error: " + e.getMessage());
             }
         }
     }
@@ -163,6 +184,7 @@ public class VideoCapture {
                 executor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
+            executor = null;
         }
 
         if (grabber != null) {
@@ -170,7 +192,7 @@ public class VideoCapture {
                 grabber.stop();
                 grabber.release();
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("Error stopping grabber: " + e.getMessage());
             }
             grabber = null;
         }
@@ -179,6 +201,7 @@ public class VideoCapture {
         primaryImageView = null;
         externalImageView = null;
         reusableBufferedImage = null;
+        currentSource = null;
     }
 
     public void setPrimaryImageView(ImageView imageView) {
@@ -191,5 +214,9 @@ public class VideoCapture {
 
     public boolean isRunning() {
         return isRunning.get();
+    }
+
+    public VideoSource getCurrentSource() {
+        return currentSource;
     }
 }

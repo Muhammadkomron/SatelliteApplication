@@ -8,6 +8,8 @@ import io.dronefleet.mavlink.minimal.Heartbeat;
 import javafx.application.Platform;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -22,6 +24,7 @@ public class TelemetryManager {
     private Thread readThread;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private OutputStream outputStream;
 
     // Mission data
     private LocalDateTime missionStartTime;
@@ -114,9 +117,12 @@ public class TelemetryManager {
             Thread.currentThread().interrupt();
         }
 
+        // Store output stream for sending commands
+        outputStream = serialPort.getOutputStream();
+
         mavlinkConnection = MavlinkConnection.create(
                 serialPort.getInputStream(),
-                serialPort.getOutputStream()
+                outputStream
         );
 
         isRunning.set(true);
@@ -155,7 +161,158 @@ public class TelemetryManager {
             serialPort.closePort();
         }
 
+        outputStream = null;
         log("Disconnected");
+    }
+
+    /**
+     * Send a command string to the satellite
+     * @param command The command to send
+     * @return true if sent successfully, false otherwise
+     */
+    public boolean sendCommand(String command) {
+        if (!isRunning.get() || outputStream == null) {
+            log("Cannot send command - not connected");
+            return false;
+        }
+
+        try {
+            // Check if it's a MAVLink command (starts with MAV_)
+            if (command.toUpperCase().startsWith("MAV_")) {
+                return sendMavlinkCommand(command);
+            } else {
+                // Send as raw serial data
+                return sendRawCommand(command);
+            }
+        } catch (Exception e) {
+            log("Error sending command: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Send raw text command via serial
+     */
+    private boolean sendRawCommand(String command) {
+        try {
+            // Add line ending if not present
+            if (!command.endsWith("\n") && !command.endsWith("\r\n")) {
+                command += "\r\n";
+            }
+
+            byte[] data = command.getBytes(StandardCharsets.UTF_8);
+            outputStream.write(data);
+            outputStream.flush();
+
+            log("Sent: " + command.trim());
+            return true;
+        } catch (IOException e) {
+            log("Failed to send raw command: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Send MAVLink command
+     */
+    private boolean sendMavlinkCommand(String command) {
+        try {
+            // Parse MAVLink command
+            String cmd = command.toUpperCase().trim();
+
+            // Example MAVLink commands
+            if (cmd.equals("MAV_ARM")) {
+                // Send ARM command
+                CommandLong armCmd = CommandLong.builder()
+                        .targetSystem(1)
+                        .targetComponent(1)
+                        .command(MavCmd.MAV_CMD_COMPONENT_ARM_DISARM)
+                        .confirmation(0)
+                        .param1(1) // 1 to arm
+                        .param2(0)
+                        .param3(0)
+                        .param4(0)
+                        .param5(0)
+                        .param6(0)
+                        .param7(0)
+                        .build();
+                mavlinkConnection.send1(255, 0, armCmd);
+                log("Sent MAVLink ARM command");
+                return true;
+
+            } else if (cmd.equals("MAV_DISARM")) {
+                // Send DISARM command
+                CommandLong disarmCmd = CommandLong.builder()
+                        .targetSystem(1)
+                        .targetComponent(1)
+                        .command(MavCmd.MAV_CMD_COMPONENT_ARM_DISARM)
+                        .confirmation(0)
+                        .param1(0) // 0 to disarm
+                        .param2(0)
+                        .param3(0)
+                        .param4(0)
+                        .param5(0)
+                        .param6(0)
+                        .param7(0)
+                        .build();
+                mavlinkConnection.send1(255, 0, disarmCmd);
+                log("Sent MAVLink DISARM command");
+                return true;
+
+            } else if (cmd.equals("MAV_REBOOT")) {
+                // Send REBOOT command
+                CommandLong rebootCmd = CommandLong.builder()
+                        .targetSystem(1)
+                        .targetComponent(1)
+                        .command(MavCmd.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN)
+                        .confirmation(0)
+                        .param1(1) // 1 to reboot autopilot
+                        .param2(0)
+                        .param3(0)
+                        .param4(0)
+                        .param5(0)
+                        .param6(0)
+                        .param7(0)
+                        .build();
+                mavlinkConnection.send1(255, 0, rebootCmd);
+                log("Sent MAVLink REBOOT command");
+                return true;
+
+            } else if (cmd.startsWith("MAV_MODE_")) {
+                // Extract mode number
+                String modeStr = cmd.replace("MAV_MODE_", "");
+                try {
+                    int mode = Integer.parseInt(modeStr);
+                    CommandLong modeCmd = CommandLong.builder()
+                            .targetSystem(1)
+                            .targetComponent(1)
+                            .command(MavCmd.MAV_CMD_DO_SET_MODE)
+                            .confirmation(0)
+                            .param1(1) // Mode
+                            .param2(mode) // Custom mode
+                            .param3(0)
+                            .param4(0)
+                            .param5(0)
+                            .param6(0)
+                            .param7(0)
+                            .build();
+                    mavlinkConnection.send1(255, 0, modeCmd);
+                    log("Sent MAVLink MODE change to " + mode);
+                    return true;
+                } catch (NumberFormatException e) {
+                    log("Invalid mode number: " + modeStr);
+                    return false;
+                }
+
+            } else {
+                log("Unknown MAVLink command: " + cmd);
+                return false;
+            }
+
+        } catch (IOException e) {
+            log("Failed to send MAVLink command: " + e.getMessage());
+            return false;
+        }
     }
 
     private void readMavlinkMessages() {
@@ -282,9 +439,11 @@ public class TelemetryManager {
         // Handle STATUSTEXT dynamically
         handleStatusText(payload);
 
-        // Log the message
+        // Log received message type (but not every message to avoid spam)
         String msgType = payload.getClass().getSimpleName();
-        log("Received: " + msgType + " from Sys:" + message.getOriginSystemId());
+        if (!msgType.equals("Heartbeat") && !msgType.equals("Attitude")) {
+            log("Received: " + msgType);
+        }
 
         // Notify callback
         if (dataUpdateCallback != null) {
@@ -308,7 +467,7 @@ public class TelemetryManager {
 
                 if (text != null && !text.isEmpty()) {
                     telemetryData.statusMessage = text;
-                    log("Status message: " + text);
+                    // Don't log here as it will be logged in serial monitor
                 }
             } catch (Exception e) {
                 // Ignore reflection errors

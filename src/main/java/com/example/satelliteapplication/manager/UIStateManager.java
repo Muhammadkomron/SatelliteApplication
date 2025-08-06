@@ -55,6 +55,7 @@ public class UIStateManager {
             connectBtn.setText("Connect");
             connectBtn.getStyleClass().remove("disconnect-button");
             connectBtn.getStyleClass().add("connect-button");
+            connectBtn.setDisable(false);
 
             // Hide expand button
             expandBtn.setVisible(false);
@@ -74,6 +75,9 @@ public class UIStateManager {
         statusLabel.setText("● " + message);
         statusLabel.getStyleClass().clear();
         statusLabel.getStyleClass().add("status-disconnected");
+        connectBtn.setText("Connect");
+        connectBtn.getStyleClass().remove("disconnect-button");
+        connectBtn.getStyleClass().add("connect-button");
         connectBtn.setDisable(false);
     }
 
