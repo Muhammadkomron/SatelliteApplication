@@ -46,17 +46,19 @@ public class MainController implements Initializable {
     @FXML private Label telemetryStatus;
     @FXML private Label videoStatus;
 
-    // Telemetry Display
+    // Telemetry Display - Updated fields
     @FXML private VBox telemetryPanel;
     @FXML private VBox telemetryPlaceholder;
-    @FXML private Label batteryLabel;
-    @FXML private Label gpsLabel;
+    @FXML private Label batteryVoltageLabel; // Changed from batteryLabel
+    @FXML private Label batteryStatusLabel; // New - for percentage
+    @FXML private Label gpsLatitudeLabel; // New - separate latitude
+    @FXML private Label gpsLongitudeLabel; // New - separate longitude
     @FXML private Label altitudeLabel;
     @FXML private Label speedLabel;
     @FXML private Label armStatusLabel;
     @FXML private Label flightModeLabel;
     @FXML private Label satellitesLabel;
-    @FXML private Label rollPitchYawLabel;
+    @FXML private Label rollPitchYawLabel; // Removed - using individual labels
 
     // New telemetry fields
     @FXML private Label missionTimeLabel;
@@ -72,10 +74,15 @@ public class MainController implements Initializable {
     @FXML private Label messageLabel;
     @FXML private Label teamIdLabel;
 
+    // Static status fields
+    @FXML private Label satelliteStatusLabel;
+    @FXML private Label errorCodeLabel;
+
     // Video Display
     @FXML private VBox videoPanel;
     @FXML private VBox videoPlaceholder;
     @FXML private StackPane videoContainer;
+    @FXML private VBox messageContainer; // New - for messages list
     private ImageView videoImageView;
     private Stage videoStage;
     private ImageView externalVideoImageView;
@@ -85,8 +92,6 @@ public class MainController implements Initializable {
     @FXML private VBox mapPanel;
     @FXML private VBox mapPlaceholder;
     @FXML private WebView mapWebView;
-    @FXML private Button clearPathBtn;
-    @FXML private Button centerMapBtn;
 
     // Service managers
     private TelemetryManager telemetryManager;
@@ -95,7 +100,11 @@ public class MainController implements Initializable {
     private VideoCapture videoCapture;
 
     // Constants
-    private static final String TEAM_ID = "001";
+    private static final String TEAM_ID = "569287";
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
+    // Message list
+    private List<String> messages = new ArrayList<>();
 
     // Helper class for serial port display
     private static class SerialPortInfo {
@@ -138,8 +147,6 @@ public class MainController implements Initializable {
         videoRefreshBtn.setOnAction(e -> refreshVideoSources());
         videoConnectBtn.setOnAction(e -> toggleVideoConnection());
         videoExpandBtn.setOnAction(e -> toggleExternalVideo());
-        clearPathBtn.setOnAction(e -> mapManager.clearPath());
-        centerMapBtn.setOnAction(e -> mapManager.centerMap());
 
         // Initially hide expand button
         videoExpandBtn.setVisible(false);
@@ -159,39 +166,49 @@ public class MainController implements Initializable {
         // Initialize telemetry fields with default values
         initializeTelemetryFields();
 
-        // Initialize team ID
-        teamIdLabel.setText("Team: " + TEAM_ID);
+        // Initialize static fields
+        teamIdLabel.setText(TEAM_ID);
+        satelliteStatusLabel.setText("0");
+        errorCodeLabel.setText("0000");
     }
 
     private void initializeTelemetryFields() {
-        missionTimeLabel.setText("00:00:00");
+        LocalDateTime now = LocalDateTime.now();
+        missionTimeLabel.setText(now.format(DATE_TIME_FORMATTER));
+        batteryVoltageLabel.setText("0.0V");
+        batteryStatusLabel.setText("0%");
         pressureLabel.setText("0.0 hPa");
         verticalVelocityLabel.setText("0.0 m/s");
         distanceLabel.setText("0.0 m");
         internalTempLabel.setText("0.0°C");
         externalTempLabel.setText("0.0°C");
         gpsAltitudeLabel.setText("0.0 m");
+        gpsLatitudeLabel.setText("0.000000");
+        gpsLongitudeLabel.setText("0.000000");
         pitchLabel.setText("0.0°");
         rollLabel.setText("0.0°");
         yawLabel.setText("0.0°");
-        messageLabel.setText("No message");
+        messageLabel.setText("No messages");
     }
 
     private void updateTelemetryDisplay(TelemetryManager.TelemetryData data) {
-        // Battery
-        if (data.batteryPercentage == -1) {
-            batteryLabel.setText(String.format("%.1fV", data.batteryVoltage));
+        // Battery - separate voltage and percentage
+        batteryVoltageLabel.setText(String.format("%.1fV", data.batteryVoltage));
+        if (data.batteryPercentage >= 0) {
+            batteryStatusLabel.setText(data.batteryPercentage + "%");
         } else {
-            batteryLabel.setText(String.format("%.1fV (%d%%)", data.batteryVoltage, data.batteryPercentage));
+            batteryStatusLabel.setText("N/A");
         }
 
-        // GPS
+        // GPS - separate latitude and longitude
         if (data.hasGpsFix) {
-            gpsLabel.setText(String.format("%.6f, %.6f", data.latitude, data.longitude));
+            gpsLatitudeLabel.setText(String.format("%.6f", data.latitude));
+            gpsLongitudeLabel.setText(String.format("%.6f", data.longitude));
             satellitesLabel.setText(String.valueOf(data.satellites));
             gpsAltitudeLabel.setText(String.format("%.1f m", data.gpsAltitude));
         } else {
-            gpsLabel.setText("No Fix");
+            gpsLatitudeLabel.setText("No Fix");
+            gpsLongitudeLabel.setText("No Fix");
             satellitesLabel.setText(data.satellites + " (no fix)");
             gpsAltitudeLabel.setText("No GPS");
         }
@@ -209,8 +226,7 @@ public class MainController implements Initializable {
         armStatusLabel.setText(data.isArmed ? "ARMED" : "DISARMED");
         armStatusLabel.setStyle(data.isArmed ? "-fx-text-fill: #e74c3c;" : "-fx-text-fill: #27ae60;");
 
-        // Attitude
-        rollPitchYawLabel.setText(String.format("R:%.0f° P:%.0f° Y:%.0f°", data.roll, data.pitch, data.yaw));
+        // Attitude - individual labels
         rollLabel.setText(String.format("%.1f°", data.roll));
         pitchLabel.setText(String.format("%.1f°", data.pitch));
         yawLabel.setText(String.format("%.1f°", data.yaw));
@@ -220,12 +236,12 @@ public class MainController implements Initializable {
         internalTempLabel.setText(String.format("%.1f°C", data.internalTemp));
         externalTempLabel.setText(String.format("%.1f°C", data.externalTemp));
 
-        // Status message
+        // Status message - add to message container
         if (!data.statusMessage.isEmpty()) {
-            messageLabel.setText(data.statusMessage.substring(0, Math.min(data.statusMessage.length(), 50)));
+            addMessage(data.statusMessage);
         }
 
-        // Update mission time
+        // Update mission time with full date/time format
         updateMissionTime();
 
         // Update map position
@@ -235,17 +251,31 @@ public class MainController implements Initializable {
     }
 
     private void updateMissionTime() {
-        LocalDateTime missionStartTime = telemetryManager.getMissionStartTime();
-        if (missionStartTime != null) {
-            LocalDateTime now = LocalDateTime.now();
-            long seconds = java.time.Duration.between(missionStartTime, now).getSeconds();
-            long hours = seconds / 3600;
-            long minutes = (seconds % 3600) / 60;
-            long secs = seconds % 60;
+        LocalDateTime now = LocalDateTime.now();
+        missionTimeLabel.setText(now.format(DATE_TIME_FORMATTER));
+    }
 
-            String timeString = String.format("%02d:%02d:%02d", hours, minutes, secs);
-            missionTimeLabel.setText(timeString);
+    private void addMessage(String message) {
+        String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        String formattedMessage = "[" + timestamp + "] " + message;
+
+        messages.add(formattedMessage);
+
+        // Keep only last 10 messages
+        if (messages.size() > 10) {
+            messages.remove(0);
         }
+
+        // Update message display
+        Platform.runLater(() -> {
+            messageContainer.getChildren().clear();
+            for (String msg : messages) {
+                Label msgLabel = new Label(msg);
+                msgLabel.getStyleClass().add("telemetry-value");
+                msgLabel.setWrapText(true);
+                messageContainer.getChildren().add(msgLabel);
+            }
+        });
     }
 
     private void refreshTelemetrySources() {
@@ -328,6 +358,7 @@ public class MainController implements Initializable {
     private void connectVideo() {
         VideoSource selectedSource = videoComboBox.getValue();
         if (selectedSource == null) {
+            showAlert("Please select a video source");
             return;
         }
 
@@ -336,6 +367,7 @@ public class MainController implements Initializable {
         new Thread(() -> {
             try {
                 if (selectedSource.getType() == VideoCapture.VideoSourceType.USB_CAMERA) {
+                    // Try to start capture
                     videoCapture.startCapture(selectedSource, videoImageView);
 
                     Platform.runLater(() -> {
@@ -346,6 +378,7 @@ public class MainController implements Initializable {
                         videoContainer.getChildren().add(videoImageView);
 
                         updateContentDisplay();
+                        log("Connected to " + selectedSource.getName());
                     });
                 } else {
                     Platform.runLater(() -> {
@@ -355,7 +388,27 @@ public class MainController implements Initializable {
             } catch (Exception e) {
                 e.printStackTrace();
                 Platform.runLater(() -> {
-                    uiStateManager.updateVideoConnectionError("Failed to connect to camera", videoStatus, videoConnectBtn);
+                    String errorMessage = e.getMessage();
+                    if (errorMessage == null) {
+                        errorMessage = "Unknown error occurred";
+                    }
+
+                    // Show user-friendly error
+                    if (errorMessage.contains("permission")) {
+                        showAlert("Camera access denied.\n\nTo grant camera access:\n1. Open System Preferences\n2. Go to Privacy & Security > Camera\n3. Enable camera access for NazarX GCS\n4. Restart the application");
+                        errorMessage = "Camera permission required";
+                    } else if (errorMessage.contains("busy")) {
+                        showAlert("Camera is already in use by another application.\n\nPlease close other camera apps and try again.");
+                        errorMessage = "Camera busy";
+                    } else if (errorMessage.contains("not available")) {
+                        showAlert("Camera " + selectedSource.getName() + " is not available.\n\nPlease check:\n- Camera is connected\n- Camera drivers are installed\n- Try a different camera index");
+                        errorMessage = "Camera not available";
+                    } else {
+                        showAlert("Failed to connect to camera:\n\n" + errorMessage);
+                    }
+
+                    uiStateManager.updateVideoConnectionError(errorMessage, videoStatus, videoConnectBtn);
+                    log("Video connection failed: " + errorMessage);
                 });
             }
         }).start();

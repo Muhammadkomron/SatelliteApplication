@@ -131,26 +131,6 @@ public class MapManager {
         }
     }
 
-    public void clearPath() {
-        if (webEngine != null && mapInitialized) {
-            try {
-                webEngine.executeScript("clearPath()");
-            } catch (Exception e) {
-                System.err.println("Error clearing path: " + e.getMessage());
-            }
-        }
-    }
-
-    public void centerMap() {
-        if (webEngine != null && mapInitialized) {
-            try {
-                webEngine.executeScript("centerMap()");
-            } catch (Exception e) {
-                System.err.println("Error centering map: " + e.getMessage());
-            }
-        }
-    }
-
     public void forceResize() {
         if (webEngine != null) {
             Platform.runLater(() -> {

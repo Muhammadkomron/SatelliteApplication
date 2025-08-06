@@ -12,6 +12,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         #map {
             width: 100%;
@@ -19,16 +20,9 @@
             position: relative;
         }
         .leaflet-container {
-            background: #ddd;
+            background: #f0f0f0;
         }
-        .satellite-marker {
-            background-color: #e74c3c;
-            border: 3px solid white;
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-        }
+
         /* Custom satellite icon styles */
         .custom-satellite-icon {
             background: white;
@@ -38,11 +32,10 @@
             align-items: center;
             justify-content: center;
             position: relative;
-        }
-        .custom-satellite-icon svg {
             width: 48px;
             height: 48px;
         }
+
         /* Pulsing animation for active tracking */
         .custom-satellite-icon::before {
             content: '';
@@ -54,16 +47,18 @@
             animation: pulse 2s infinite;
             box-sizing: border-box;
         }
+
         @keyframes pulse {
             0% {
                 transform: scale(1);
                 opacity: 1;
             }
             100% {
-                transform: scale(1.2);
+                transform: scale(1.3);
                 opacity: 0;
             }
         }
+
         /* Direction indicator */
         .direction-arrow {
             position: absolute;
@@ -72,35 +67,16 @@
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
             border-bottom: 16px solid #e74c3c;
-            top: -22px;
+            top: -20px;
             left: 50%;
             transform: translateX(-50%);
-            transform-origin: center bottom;
+            transform-origin: center 16px;
         }
 
         /* Custom control buttons */
-        .custom-control {
-            background: white;
-            border: 2px solid rgba(0,0,0,0.2);
-            border-radius: 4px;
-            cursor: pointer;
-            text-align: center;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.35);
-        }
-
-        .custom-control:hover {
-            background: #f4f4f4;
-        }
-
-        .leaflet-control-custom-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
         .custom-control-button {
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
             background: white;
             border: 2px solid rgba(0,0,0,0.2);
             border-radius: 4px;
@@ -108,38 +84,25 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 16px;
             color: #333;
             transition: all 0.2s;
+            text-decoration: none;
+            margin-bottom: 1px;
         }
 
         .custom-control-button:hover {
             background: #f4f4f4;
-            transform: scale(1.1);
+            border-color: rgba(0,0,0,0.3);
         }
 
         .custom-control-button:active {
             transform: scale(0.95);
         }
 
-        /* Layer control styling */
-        .leaflet-control-layers {
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .leaflet-control-layers-expanded {
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.95);
-        }
-
-        /* Scale control styling */
-        .leaflet-control-scale {
-            border: 2px solid #777;
-            border-top: none;
-            background: rgba(255, 255, 255, 0.8);
-            box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+        .leaflet-control-custom-buttons {
+            display: flex;
+            flex-direction: column;
         }
 
         /* Coordinate display */
@@ -151,59 +114,91 @@
             background: rgba(255, 255, 255, 0.95);
             padding: 8px 16px;
             border-radius: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            font-family: monospace;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-family: 'Courier New', monospace;
             font-size: 12px;
             z-index: 1000;
+            border: 1px solid rgba(0,0,0,0.1);
         }
 
-        /* Fullscreen control */
-        .leaflet-control-fullscreen a {
-            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTcgMTRINXY1aDV2LTJIN3YtM3ptLTItNGgyVjdoM1Y1SDV2NXptMTIgN2gtM3YyaDV2LTVoLTJ2M3pNMTQgNXYyaDN2M2gyVjVoLTV6Ii8+PC9zdmc+');
-            background-size: 16px 16px;
-            background-position: center;
-            background-repeat: no-repeat;
+        /* Scale control styling */
+        .leaflet-control-scale {
+            border: 2px solid #777;
+            border-top: none;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
         }
 
-        .leaflet-fullscreen-on .leaflet-control-fullscreen a {
-            background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTUgMTZoM3YzaDJ2LTVINXYyem0zLThINXYyaDVWNUg4djN6bTYgMTF2LTNoM3YtMmgtNXY1aDJ6bTMtMTFWNWgtMnY1aDVWOGgtM3oiLz48L3N2Zz4=');
+        /* Layer control styling */
+        .leaflet-control-layers {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .leaflet-control-layers-expanded {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        /* Measurement popup */
+        .measure-popup {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        /* Loading indicator */
+        .map-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #666;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="map">
+    <div class="map-loading" id="loadingIndicator">Loading map...</div>
+</div>
 <div class="coordinate-display" id="coordinateDisplay">
-    Lat: <span id="latDisplay">41.2995</span> | Lon: <span id="lonDisplay">69.2401</span> | Zoom: <span id="zoomDisplay">13</span>
+    Lat: <span id="latDisplay">41.2995</span> | Lon: <span id="lonDisplay">69.2401</span> | Zoom: <span id="zoomDisplay">15</span>
 </div>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@2.4.0/Control.FullScreen.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@2.4.0/Control.FullScreen.min.css" />
 <script>
     var map = null;
     var marker = null;
     var pathLine = null;
     var pathCoordinates = [];
     var currentHeading = 0;
+    var measureMode = false;
+    var measureLine = null;
+    var measurePoints = [];
 
     function initializeMap() {
         try {
-            // Create map instance with additional options
+            console.log('Initializing map...');
+
+            // Hide loading indicator
+            document.getElementById('loadingIndicator').style.display = 'none';
+
+            // Create map instance
             map = L.map('map', {
                 center: [41.2995, 69.2401],
-                zoom: 13,
-                preferCanvas: false,
-                zoomControl: false, // We'll add custom zoom control
-                fullscreenControl: true,
-                fullscreenControlOptions: {
-                    position: 'topright'
-                }
+                zoom: 15,
+                zoomControl: false,
+                attributionControl: true
             });
 
             // Define base layers
             var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
-                maxZoom: 19,
-                tileSize: 256
+                maxZoom: 19
             });
 
             var satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -216,34 +211,17 @@
                 maxZoom: 17
             });
 
-            var darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '© CartoDB',
-                maxZoom: 19
-            });
-
             // Add satellite layer as default
             satelliteLayer.addTo(map);
-
-            // Define overlay layers
-            var weatherLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=YOUR_API_KEY', {
-                attribution: '© OpenWeatherMap',
-                opacity: 0.5,
-                maxZoom: 19
-            });
 
             // Create layer control
             var baseLayers = {
                 "Street Map": osmLayer,
                 "Satellite": satelliteLayer,
-                "Terrain": terrainLayer,
-                "Dark Mode": darkLayer
+                "Terrain": terrainLayer
             };
 
-            var overlayLayers = {
-                // "Weather": weatherLayer // Uncomment if you have OpenWeatherMap API key
-            };
-
-            L.control.layers(baseLayers, overlayLayers, {
+            L.control.layers(baseLayers, null, {
                 position: 'topright'
             }).addTo(map);
 
@@ -251,18 +229,16 @@
             L.control.scale({
                 position: 'bottomleft',
                 metric: true,
-                imperial: false,
-                maxWidth: 200
+                imperial: false
             }).addTo(map);
 
-            // Add custom zoom control
-            var zoomControl = L.control.zoom({
+            // Add zoom control
+            L.control.zoom({
                 position: 'topleft'
-            });
-            zoomControl.addTo(map);
+            }).addTo(map);
 
             // Create custom control for additional buttons
-            var customControl = L.Control.extend({
+            var CustomControl = L.Control.extend({
                 options: {
                     position: 'topleft'
                 },
@@ -275,57 +251,54 @@
                     homeButton.innerHTML = '🏠';
                     homeButton.title = 'Go to home position';
                     homeButton.href = '#';
-
-                    L.DomEvent.on(homeButton, 'click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        L.DomEvent.preventDefault(e);
-                        map.setView([41.2995, 69.2401], 13);
-                    });
+                    homeButton.onclick = function(e) {
+                        e.preventDefault();
+                        map.setView([41.2995, 69.2401], 15);
+                        return false;
+                    };
 
                     // Center on marker button
                     var centerButton = L.DomUtil.create('a', 'custom-control-button', container);
                     centerButton.innerHTML = '🎯';
                     centerButton.title = 'Center on satellite';
                     centerButton.href = '#';
-
-                    L.DomEvent.on(centerButton, 'click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        L.DomEvent.preventDefault(e);
+                    centerButton.onclick = function(e) {
+                        e.preventDefault();
                         if (marker) {
                             map.setView(marker.getLatLng(), map.getZoom());
                         }
-                    });
+                        return false;
+                    };
 
                     // Clear path button
                     var clearButton = L.DomUtil.create('a', 'custom-control-button', container);
-                    clearButton.innerHTML = '🗑️';
+                    clearButton.innerHTML = '✕';
                     clearButton.title = 'Clear path';
                     clearButton.href = '#';
-
-                    L.DomEvent.on(clearButton, 'click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        L.DomEvent.preventDefault(e);
+                    clearButton.style.fontWeight = 'bold';
+                    clearButton.style.fontSize = '20px';
+                    clearButton.onclick = function(e) {
+                        e.preventDefault();
                         clearPath();
-                    });
+                        return false;
+                    };
 
                     // Measure distance button
                     var measureButton = L.DomUtil.create('a', 'custom-control-button', container);
                     measureButton.innerHTML = '📏';
                     measureButton.title = 'Measure distance';
                     measureButton.href = '#';
-
-                    L.DomEvent.on(measureButton, 'click', function(e) {
-                        L.DomEvent.stopPropagation(e);
-                        L.DomEvent.preventDefault(e);
-                        // Toggle measure mode
+                    measureButton.onclick = function(e) {
+                        e.preventDefault();
                         toggleMeasureMode();
-                    });
+                        return false;
+                    };
 
                     return container;
                 }
             });
 
-            map.addControl(new customControl());
+            map.addControl(new CustomControl());
 
             // Add coordinate display update
             map.on('mousemove', function(e) {
@@ -338,23 +311,6 @@
             });
 
             // Measurement functionality
-            var measureMode = false;
-            var measureLine = null;
-            var measurePoints = [];
-
-            function toggleMeasureMode() {
-                measureMode = !measureMode;
-                if (!measureMode && measureLine) {
-                    map.removeLayer(measureLine);
-                    measurePoints.forEach(function(marker) {
-                        map.removeLayer(marker);
-                    });
-                    measurePoints = [];
-                    measureLine = null;
-                }
-                map.getContainer().style.cursor = measureMode ? 'crosshair' : '';
-            }
-
             map.on('click', function(e) {
                 if (measureMode) {
                     var marker = L.circleMarker(e.latlng, {
@@ -388,98 +344,51 @@
                         }
 
                         // Show distance
-                        L.popup()
+                        L.popup({
+                            className: 'measure-popup'
+                        })
                             .setLatLng(e.latlng)
-                            .setContent('Total distance: ' + (totalDistance / 1000).toFixed(2) + ' km')
+                            .setContent('Distance: ' + (totalDistance / 1000).toFixed(2) + ' km')
                             .openOn(map);
                     }
                 }
             });
 
-            // Create custom satellite icon with SVG
+            // Create custom satellite icon
             var satelliteIcon = L.divIcon({
                 className: 'custom-satellite-icon',
                 html: `
-                        <div style="position: relative;">
-                            <div class="direction-arrow" id="direction-arrow"></div>
-                            <svg viewBox="0 0 24 24"
-                                 xmlns="http://www.w3.org/2000/svg"
-                                 width="100%"
-                                 height="100%"
-                                 preserveAspectRatio="xMidYMid meet"
-                                 fill="none">
-
-                                <!-- Satellite body -->
-                                <rect x="8" y="8" width="8" height="8" rx="1" fill="#2c3e50" stroke="#34495e" stroke-width="0.5"/>
-
-                                <!-- Solar panels -->
-                                <rect x="2" y="10" width="5" height="4" rx="0.5" fill="#3498db" stroke="#2980b9" stroke-width="0.5"/>
-                                <rect x="17" y="10" width="5" height="4" rx="0.5" fill="#3498db" stroke="#2980b9" stroke-width="0.5"/>
-
-                                <!-- Panel details -->
-                                <line x1="3" y1="11.5" x2="6" y2="11.5" stroke="#2980b9" stroke-width="0.3"/>
-                                <line x1="3" y1="12.5" x2="6" y2="12.5" stroke="#2980b9" stroke-width="0.3"/>
-                                <line x1="18" y1="11.5" x2="21" y2="11.5" stroke="#2980b9" stroke-width="0.3"/>
-                                <line x1="18" y1="12.5" x2="21" y2="12.5" stroke="#2980b9" stroke-width="0.3"/>
-
-                                <!-- Antenna -->
-                                <circle cx="12" cy="12" r="1.5" fill="#e74c3c" stroke="#c0392b" stroke-width="0.5"/>
-
-                                <!-- Signal waves -->
-                                <circle cx="12" cy="12" r="3" fill="none" stroke="#e74c3c" stroke-width="0.3" opacity="0.5"/>
-                                <circle cx="12" cy="12" r="4.5" fill="none" stroke="#e74c3c" stroke-width="0.2" opacity="0.3"/>
-                            </svg>
-                        </div>
-                    `,
-                iconSize: [54, 54],
-                iconAnchor: [30, 30],
-                popupAnchor: [0, -30]
-            });
-
-            // Alternative drone icon option (commented out)
-            /*
-            var droneIcon = L.divIcon({
-                className: 'custom-satellite-icon',
-                html: `
-                    <div style="position: relative;">
+                    <div style="position: relative; width: 100%; height: 100%;">
                         <div class="direction-arrow" id="direction-arrow"></div>
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Drone body -->
-                            <circle cx="12" cy="12" r="3" fill="#2c3e50" stroke="#34495e" stroke-width="0.5"/>
+                        <svg viewBox="0 0 48 48" width="48" height="48" style="position: absolute; top: 0; left: 0;">
+                            <!-- Satellite body -->
+                            <rect x="16" y="16" width="16" height="16" rx="2" fill="#2c3e50" stroke="#34495e" stroke-width="1"/>
 
-                            <!-- Arms -->
-                            <line x1="12" y1="12" x2="5" y2="5" stroke="#34495e" stroke-width="1.5"/>
-                            <line x1="12" y1="12" x2="19" y2="5" stroke="#34495e" stroke-width="1.5"/>
-                            <line x1="12" y1="12" x2="5" y2="19" stroke="#34495e" stroke-width="1.5"/>
-                            <line x1="12" y1="12" x2="19" y2="19" stroke="#34495e" stroke-width="1.5"/>
+                            <!-- Solar panels -->
+                            <rect x="4" y="20" width="10" height="8" rx="1" fill="#3498db" stroke="#2980b9" stroke-width="1"/>
+                            <rect x="34" y="20" width="10" height="8" rx="1" fill="#3498db" stroke="#2980b9" stroke-width="1"/>
 
-                            <!-- Propellers -->
-                            <circle cx="5" cy="5" r="3" fill="none" stroke="#3498db" stroke-width="0.5"/>
-                            <circle cx="19" cy="5" r="3" fill="none" stroke="#3498db" stroke-width="0.5"/>
-                            <circle cx="5" cy="19" r="3" fill="none" stroke="#3498db" stroke-width="0.5"/>
-                            <circle cx="19" cy="19" r="3" fill="none" stroke="#3498db" stroke-width="0.5"/>
+                            <!-- Panel lines -->
+                            <line x1="6" y1="24" x2="12" y2="24" stroke="#2980b9" stroke-width="0.5"/>
+                            <line x1="36" y1="24" x2="42" y2="24" stroke="#2980b9" stroke-width="0.5"/>
 
-                            <!-- Propeller blades -->
-                            <path d="M5 2 L5 8 M2 5 L8 5" stroke="#3498db" stroke-width="1"/>
-                            <path d="M19 2 L19 8 M16 5 L22 5" stroke="#3498db" stroke-width="1"/>
-                            <path d="M5 16 L5 22 M2 19 L8 19" stroke="#3498db" stroke-width="1"/>
-                            <path d="M19 16 L19 22 M16 19 L22 19" stroke="#3498db" stroke-width="1"/>
+                            <!-- Antenna -->
+                            <circle cx="24" cy="24" r="3" fill="#e74c3c" stroke="#c0392b" stroke-width="1"/>
 
-                            <!-- Center indicator -->
-                            <circle cx="12" cy="12" r="1" fill="#e74c3c"/>
+                            <!-- Signal waves -->
+                            <circle cx="24" cy="24" r="6" fill="none" stroke="#e74c3c" stroke-width="0.5" opacity="0.5"/>
+                            <circle cx="24" cy="24" r="9" fill="none" stroke="#e74c3c" stroke-width="0.5" opacity="0.3"/>
                         </svg>
                     </div>
                 `,
-                iconSize: [40, 40],
-                iconAnchor: [20, 20],
-                popupAnchor: [0, -20]
+                iconSize: [48, 48],
+                iconAnchor: [24, 24],
+                popupAnchor: [0, -24]
             });
-            */
 
             // Add marker
             marker = L.marker([41.2995, 69.2401], {
-                icon: satelliteIcon,
-                rotationAngle: 0
+                icon: satelliteIcon
             }).addTo(map);
 
             // Add popup to marker
@@ -489,20 +398,36 @@
             pathLine = L.polyline([], {
                 color: '#3498db',
                 weight: 4,
-                opacity: 0.7
+                opacity: 0.7,
+                smoothFactor: 1
             }).addTo(map);
 
             // Force resize after a delay
             setTimeout(function() {
                 map.invalidateSize();
-            }, 250);
+            }, 100);
 
             console.log('Map initialized successfully');
             return true;
+
         } catch (error) {
             console.error('Error initializing map:', error);
+            document.getElementById('loadingIndicator').textContent = 'Error loading map';
             return false;
         }
+    }
+
+    function toggleMeasureMode() {
+        measureMode = !measureMode;
+        if (!measureMode && measureLine) {
+            map.removeLayer(measureLine);
+            measurePoints.forEach(function(marker) {
+                map.removeLayer(marker);
+            });
+            measurePoints = [];
+            measureLine = null;
+        }
+        map.getContainer().style.cursor = measureMode ? 'crosshair' : '';
     }
 
     // Update marker position
@@ -518,7 +443,7 @@
             // Update marker position
             marker.setLatLng(newLatLng);
 
-            // Update heading/direction if provided
+            // Update heading/direction
             if (heading !== undefined && heading !== null) {
                 currentHeading = heading;
                 var arrow = document.getElementById('direction-arrow');
@@ -532,19 +457,18 @@
             pathLine.setLatLngs(pathCoordinates);
 
             // Update popup content
-            marker.setPopupContent('<b>Satellite Position</b><br>Lat: ' + lat.toFixed(6) +
-                '<br>Lon: ' + lon.toFixed(6) +
-                '<br>Heading: ' + (currentHeading || 0).toFixed(0) + '°' +
-                '<br>Time: ' + new Date().toLocaleTimeString());
-
-            // Pan to marker if out of view
-            if (!map.getBounds().contains(newLatLng)) {
-                map.panTo(newLatLng);
-            }
+            marker.setPopupContent(
+                '<b>Satellite Position</b><br>' +
+                'Lat: ' + lat.toFixed(6) + '<br>' +
+                'Lon: ' + lon.toFixed(6) + '<br>' +
+                'Heading: ' + (currentHeading || 0).toFixed(0) + '°<br>' +
+                'Time: ' + new Date().toLocaleTimeString()
+            );
 
             // Update coordinate display
             document.getElementById('latDisplay').textContent = lat.toFixed(6);
             document.getElementById('lonDisplay').textContent = lon.toFixed(6);
+
         } catch (error) {
             console.error('Error updating position:', error);
         }
@@ -556,6 +480,7 @@
             pathCoordinates = [];
             pathLine.setLatLngs([]);
         }
+        console.log('Path cleared');
     }
 
     // Center map on marker
@@ -578,9 +503,14 @@
     });
 
     // Also try to initialize immediately
-    if (document.readyState === 'complete') {
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
         initializeMap();
     }
+
+    // Make functions available globally for JavaFX
+    window.updatePosition = updatePosition;
+    window.clearPath = clearPath;
+    window.centerMap = centerMap;
 </script>
 </body>
 </html>

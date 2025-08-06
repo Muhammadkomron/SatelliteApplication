@@ -10,15 +10,23 @@ import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameGrabber;
 
 import java.awt.image.BufferedImage;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class VideoCapture {
     private FrameGrabber grabber;
-    private Thread captureThread;
+    private ScheduledExecutorService executor;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private volatile ImageView primaryImageView;
     private volatile ImageView externalImageView;
     private final Java2DFrameConverter converter = new Java2DFrameConverter();
+
+    // Performance optimization
+    private BufferedImage reusableBufferedImage;
+    private long lastFrameTime = 0;
+    private static final long FRAME_INTERVAL_MS = 33; // 30 FPS
 
     public enum VideoSourceType {
         USB_CAMERA,
@@ -62,82 +70,115 @@ public class VideoCapture {
         this.primaryImageView = imageView;
         isRunning.set(true);
 
-        captureThread = new Thread(() -> {
-            try {
-                if (source.getType() == VideoSourceType.USB_CAMERA) {
-                    int deviceIndex = (Integer) source.getSource();
-                    grabber = new OpenCVFrameGrabber(deviceIndex);
+        try {
+            if (source.getType() == VideoSourceType.USB_CAMERA) {
+                int deviceIndex = (Integer) source.getSource();
+                grabber = new OpenCVFrameGrabber(deviceIndex);
 
-                    // Set capture parameters
-                    grabber.setImageWidth(1280);
-                    grabber.setImageHeight(720);
-                    grabber.setFrameRate(30);
+                // Optimize capture settings for performance
+                grabber.setImageWidth(1280);
+                grabber.setImageHeight(720);
+                grabber.setFrameRate(30);
 
-                    grabber.start();
+                // Set format for better performance
+                grabber.setFormat("mjpeg"); // Use MJPEG if available
 
-                    System.out.println("Started capturing from: " + source.getName());
+                grabber.start();
 
-                    while (isRunning.get()) {
-                        Frame frame = grabber.grab();
-                        if (frame != null && frame.image != null) {
-                            BufferedImage bufferedImage = converter.convert(frame);
-                            if (bufferedImage != null) {
-                                Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
+                System.out.println("Started capturing from: " + source.getName());
 
-                                Platform.runLater(() -> {
-                                    // Update primary display if set
-                                    ImageView primary = primaryImageView;
-                                    if (primary != null) {
-                                        primary.setImage(fxImage);
-                                    }
+                // Use scheduled executor for consistent frame rate
+                executor = Executors.newSingleThreadScheduledExecutor(r -> {
+                    Thread t = new Thread(r, "VideoCapture");
+                    t.setDaemon(true);
+                    t.setPriority(Thread.MAX_PRIORITY);
+                    return t;
+                });
 
-                                    // Update external display if available
-                                    ImageView external = externalImageView;
-                                    if (external != null) {
-                                        external.setImage(fxImage);
-                                    }
-                                });
-                            }
+                executor.scheduleAtFixedRate(this::captureFrame, 0, FRAME_INTERVAL_MS, TimeUnit.MILLISECONDS);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            stopCapture();
+            Platform.runLater(() -> {
+                System.err.println("Error starting video capture: " + e.getMessage());
+            });
+        }
+    }
+
+    private void captureFrame() {
+        if (!isRunning.get()) {
+            return;
+        }
+
+        try {
+            // Skip frame if we're running behind
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastFrameTime < FRAME_INTERVAL_MS - 5) {
+                return;
+            }
+            lastFrameTime = currentTime;
+
+            Frame frame = grabber.grab();
+            if (frame != null && frame.image != null) {
+                // Reuse BufferedImage for better performance
+                BufferedImage bufferedImage = converter.getBufferedImage(frame);
+                if (bufferedImage != null) {
+                    reusableBufferedImage = bufferedImage;
+
+                    // Convert to FX Image
+                    Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
+
+                    // Update UI on FX thread
+                    Platform.runLater(() -> {
+                        ImageView primary = primaryImageView;
+                        if (primary != null) {
+                            primary.setImage(fxImage);
                         }
 
-                        // Small delay to control frame rate
-                        Thread.sleep(33); // ~30 FPS
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                Platform.runLater(() -> {
-                    System.err.println("Error capturing video: " + e.getMessage());
-                });
-            } finally {
-                try {
-                    if (grabber != null) {
-                        grabber.stop();
-                        grabber.release();
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
+                        ImageView external = externalImageView;
+                        if (external != null) {
+                            external.setImage(fxImage);
+                        }
+                    });
                 }
             }
-        });
-
-        captureThread.setDaemon(true);
-        captureThread.start();
+        } catch (Exception e) {
+            if (isRunning.get()) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void stopCapture() {
         isRunning.set(false);
 
-        if (captureThread != null) {
+        if (executor != null) {
+            executor.shutdown();
             try {
-                captureThread.join(2000);
+                if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
+                    executor.shutdownNow();
+                }
             } catch (InterruptedException e) {
+                executor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
         }
 
+        if (grabber != null) {
+            try {
+                grabber.stop();
+                grabber.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            grabber = null;
+        }
+
+        // Clear references
         primaryImageView = null;
         externalImageView = null;
+        reusableBufferedImage = null;
     }
 
     public void setPrimaryImageView(ImageView imageView) {
