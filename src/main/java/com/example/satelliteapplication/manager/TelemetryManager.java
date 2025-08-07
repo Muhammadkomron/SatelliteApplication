@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public class TelemetryManager {
@@ -31,6 +32,10 @@ public class TelemetryManager {
     private double homeLatitude = 0;
     private double homeLongitude = 0;
     private boolean homePositionSet = false;
+
+    // Packet tracking
+    private final AtomicLong packetCounter = new AtomicLong(0);
+    private final AtomicLong lastSequenceNumber = new AtomicLong(-1);
 
     // Telemetry data
     private final TelemetryData telemetryData = new TelemetryData();
@@ -70,6 +75,10 @@ public class TelemetryManager {
         public double distanceFromHome;
         public String statusMessage = "";
 
+        // Packet tracking
+        public long totalPackets = 0;
+        public int currentSequence = 0;
+
         // GPS status
         public boolean hasValidPosition() {
             return latitude != 0 && longitude != 0;
@@ -97,6 +106,10 @@ public class TelemetryManager {
         }
 
         this.serialPort = port;
+
+        // Reset packet counters
+        packetCounter.set(0);
+        lastSequenceNumber.set(-1);
 
         // Configure for LR900 defaults
         serialPort.setBaudRate(57600);
@@ -325,6 +338,10 @@ public class TelemetryManager {
                 MavlinkMessage<?> message = mavlinkConnection.next();
                 if (message != null) {
                     timeoutCount = 0;
+
+                    // Track packet sequence
+                    trackPacketSequence(message);
+
                     handleMavlinkMessage(message);
                 }
             } catch (IOException e) {
@@ -354,6 +371,31 @@ public class TelemetryManager {
             }
         }
         log("MAVLink reader thread stopped");
+    }
+
+    private void trackPacketSequence(MavlinkMessage<?> message) {
+        // Increment total packet counter
+        long totalPackets = packetCounter.incrementAndGet();
+        telemetryData.totalPackets = totalPackets;
+
+        // Get sequence number from the message
+        int sequence = message.getSequence();
+        telemetryData.currentSequence = sequence;
+
+        // Check for packet loss (sequences should increment by 1, wrapping at 255)
+        long lastSeq = lastSequenceNumber.get();
+        if (lastSeq != -1) {
+            int expectedSeq = ((int)lastSeq + 1) % 256;
+            if (sequence != expectedSeq) {
+                // Packet loss detected
+                int lostPackets = (sequence - expectedSeq + 256) % 256;
+                if (lostPackets > 0 && lostPackets < 128) { // Sanity check
+                    log(String.format("Packet loss detected: lost %d packets (expected seq %d, got %d)",
+                            lostPackets, expectedSeq, sequence));
+                }
+            }
+        }
+        lastSequenceNumber.set(sequence);
     }
 
     private void handleMavlinkMessage(MavlinkMessage<?> message) {
@@ -442,7 +484,8 @@ public class TelemetryManager {
         // Log received message type (but not every message to avoid spam)
         String msgType = payload.getClass().getSimpleName();
         if (!msgType.equals("Heartbeat") && !msgType.equals("Attitude")) {
-            log("Received: " + msgType);
+            // Include packet info in log for debugging
+            // log(String.format("Received: %s (seq: %d)", msgType, message.getSequence()));
         }
 
         // Notify callback
@@ -552,5 +595,9 @@ public class TelemetryManager {
 
     public boolean isConnected() {
         return isRunning.get();
+    }
+
+    public long getTotalPackets() {
+        return packetCounter.get();
     }
 }

@@ -73,6 +73,7 @@ public class MainController implements Initializable {
     @FXML private Label teamIdLabel;
     @FXML private Label satelliteStatusLabel;
     @FXML private Label errorCodeLabel;
+    @FXML private Label packetCountLabel;
 
     // Serial Monitor Components (from FXML)
     @FXML private ScrollPane serialScrollPane;
@@ -333,6 +334,7 @@ public class MainController implements Initializable {
         pitchLabel.setText("0.0°");
         rollLabel.setText("0.0°");
         yawLabel.setText("0.0°");
+        packetCountLabel.setText("0");  // Add this line
     }
 
     private void updateTelemetryDisplay(TelemetryManager.TelemetryData data) {
@@ -377,6 +379,9 @@ public class MainController implements Initializable {
         pressureLabel.setText(String.format("%.1f hPa", data.pressure));
         internalTempLabel.setText(String.format("%.1f°C", data.internalTemp));
         externalTempLabel.setText(String.format("%.1f°C", data.externalTemp));
+
+        // Packet counter - show both total and current sequence
+        packetCountLabel.setText(String.format("%d (seq: %d)", data.totalPackets, data.currentSequence));
 
         // Update mission time
         updateMissionTime();

@@ -96,7 +96,7 @@
                      <children>
 
                         <!-- Static Status Row -->
-                        <GridPane hgap="30.0" prefHeight="20.0" prefWidth="900.0">
+                        <GridPane hgap="30.0" prefHeight="20.0" prefWidth="1100.0">
                            <children>
                               <Label styleClass="telemetry-label" text="Team ID:" GridPane.columnIndex="0" />
                               <Label fx:id="teamIdLabel" styleClass="telemetry-value" text="569287" GridPane.columnIndex="1" />
@@ -107,18 +107,23 @@
                               <Label styleClass="telemetry-label" text="Error Code:" GridPane.columnIndex="4" />
                               <Label fx:id="errorCodeLabel" styleClass="telemetry-value" text="0000" GridPane.columnIndex="5" />
 
-                              <Label styleClass="telemetry-label" text="Mission Time:" GridPane.columnIndex="6" />
-                              <Label fx:id="missionTimeLabel" styleClass="telemetry-value" text="01/01/2025 00:00:00" GridPane.columnIndex="7" />
+                              <Label styleClass="telemetry-label" text="Packet Count:" GridPane.columnIndex="6" />
+                              <Label fx:id="packetCountLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="7" />
+
+                              <Label styleClass="telemetry-label" text="Mission Time:" GridPane.columnIndex="8" />
+                              <Label fx:id="missionTimeLabel" styleClass="telemetry-value" text="01/01/2025 00:00:00" GridPane.columnIndex="9" />
                            </children>
                            <columnConstraints>
-                              <ColumnConstraints maxWidth="80.0" minWidth="76.08740997314453" prefWidth="77.3916015625" />
-                              <ColumnConstraints maxWidth="83.91259002685547" minWidth="80.0" prefWidth="82.6083984375" />
-                              <ColumnConstraints minWidth="100.0" />
-                              <ColumnConstraints minWidth="60.0" />
-                              <ColumnConstraints minWidth="80.0" />
-                              <ColumnConstraints minWidth="60.0" />
-                              <ColumnConstraints minWidth="100.0" />
-                              <ColumnConstraints minWidth="150.0" />
+                              <ColumnConstraints maxWidth="80.0" minWidth="76.0" prefWidth="77.0" />
+                              <ColumnConstraints maxWidth="85.0" minWidth="80.0" prefWidth="83.0" />
+                              <ColumnConstraints minWidth="100.0" prefWidth="100.0" />
+                              <ColumnConstraints minWidth="60.0" prefWidth="60.0" />
+                              <ColumnConstraints minWidth="80.0" prefWidth="80.0" />
+                              <ColumnConstraints minWidth="60.0" prefWidth="60.0" />
+                              <ColumnConstraints minWidth="90.0" prefWidth="90.0" />
+                              <ColumnConstraints minWidth="100.0" prefWidth="100.0" />
+                              <ColumnConstraints minWidth="100.0" prefWidth="100.0" />
+                              <ColumnConstraints minWidth="150.0" prefWidth="150.0" />
                            </columnConstraints>
                            <rowConstraints>
                               <RowConstraints />
