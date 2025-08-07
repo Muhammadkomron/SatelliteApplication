@@ -86,18 +86,17 @@
          </VBox.margin>
          <children>
             <!-- TOP SECTION - Telemetry Data (Fixed Height) -->
-            <StackPane minHeight="320.0" maxHeight="320.0" prefHeight="320.0" styleClass="content-area">
+            <StackPane maxHeight="320.0" minHeight="320.0" prefHeight="320.0" styleClass="content-area">
                <children>
                   <!-- Telemetry Panel (shown when connected) -->
-                  <VBox fx:id="telemetryPanel" alignment="TOP_LEFT" managed="false" spacing="12.0" visible="false">
+                  <VBox fx:id="telemetryPanel" alignment="TOP_LEFT" spacing="12.0" visible="false">
                      <padding>
                         <Insets bottom="15.0" left="20.0" right="20.0" top="15.0" />
                      </padding>
                      <children>
-                        <Label styleClass="section-header" text="Telemetry Data" />
 
                         <!-- Static Status Row -->
-                        <GridPane hgap="30.0">
+                        <GridPane hgap="30.0" prefHeight="20.0" prefWidth="900.0">
                            <children>
                               <Label styleClass="telemetry-label" text="Team ID:" GridPane.columnIndex="0" />
                               <Label fx:id="teamIdLabel" styleClass="telemetry-value" text="569287" GridPane.columnIndex="1" />
@@ -112,8 +111,8 @@
                               <Label fx:id="missionTimeLabel" styleClass="telemetry-value" text="01/01/2025 00:00:00" GridPane.columnIndex="7" />
                            </children>
                            <columnConstraints>
-                              <ColumnConstraints minWidth="80.0" />
-                              <ColumnConstraints minWidth="80.0" />
+                              <ColumnConstraints maxWidth="80.0" minWidth="76.08740997314453" prefWidth="77.3916015625" />
+                              <ColumnConstraints maxWidth="83.91259002685547" minWidth="80.0" prefWidth="82.6083984375" />
                               <ColumnConstraints minWidth="100.0" />
                               <ColumnConstraints minWidth="60.0" />
                               <ColumnConstraints minWidth="80.0" />
@@ -124,11 +123,14 @@
                            <rowConstraints>
                               <RowConstraints />
                            </rowConstraints>
+                           <VBox.margin>
+                              <Insets top="10.0" />
+                           </VBox.margin>
                         </GridPane>
 
                         <Separator styleClass="separator" />
 
-                        <!-- Main telemetry data grid (3 columns for better horizontal space usage) -->
+                        <!-- Main telemetry data grid (4 columns for better horizontal space usage) -->
                         <GridPane hgap="40.0" styleClass="telemetry-grid" vgap="12.0">
                            <children>
                               <!-- Column 1 -->
@@ -228,7 +230,7 @@
             <HBox spacing="10.0" VBox.vgrow="ALWAYS">
                <children>
                   <!-- Left Part - Serial Monitor -->
-                  <VBox styleClass="content-area" alignment="TOP_LEFT" spacing="10.0" HBox.hgrow="ALWAYS" minWidth="200.0" prefWidth="450.0">
+                  <VBox alignment="TOP_LEFT" minWidth="200.0" prefWidth="450.0" spacing="10.0" styleClass="content-area" HBox.hgrow="ALWAYS">
                      <padding>
                         <Insets bottom="15.0" left="20.0" right="20.0" top="15.0" />
                      </padding>
@@ -247,18 +249,18 @@
                         </ScrollPane>
 
                         <!-- Input Controls -->
-                        <HBox spacing="5.0" alignment="CENTER_LEFT">
+                        <HBox alignment="CENTER_LEFT" spacing="5.0">
                            <children>
                               <TextField fx:id="serialInputField" promptText="Enter command..." styleClass="serial-input" HBox.hgrow="ALWAYS" />
-                              <Button fx:id="serialSendButton" text="Send" styleClass="serial-send-button" minWidth="60.0" />
-                              <Button fx:id="serialClearButton" text="Clear" styleClass="serial-clear-button" minWidth="60.0" />
+                              <Button fx:id="serialSendButton" minWidth="60.0" styleClass="serial-send-button" text="Send" />
+                              <Button fx:id="serialClearButton" minWidth="60.0" styleClass="serial-clear-button" text="Clear" />
                            </children>
                         </HBox>
                      </children>
                   </VBox>
 
                   <!-- Middle Part - Video Feed -->
-                  <StackPane styleClass="content-area" HBox.hgrow="ALWAYS" minWidth="200.0" prefWidth="450.0">
+                  <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
                      <children>
                         <!-- Video Panel (shown when connected) -->
                         <VBox fx:id="videoPanel" alignment="TOP_LEFT" managed="false" spacing="10.0" visible="false">
@@ -295,7 +297,7 @@
                   </StackPane>
 
                   <!-- Right Part - GPS Map -->
-                  <StackPane styleClass="content-area" HBox.hgrow="ALWAYS" minWidth="200.0" prefWidth="450.0">
+                  <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
                      <children>
                         <!-- Map Panel (shown when telemetry connected) -->
                         <VBox fx:id="mapPanel" alignment="TOP_LEFT" managed="false" spacing="10.0" visible="false">
