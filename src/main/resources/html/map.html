@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
         }
         #map {
             width: 100%;
@@ -248,7 +248,7 @@
 
                     // Home button
                     var homeButton = L.DomUtil.create('a', 'custom-control-button', container);
-                    homeButton.innerHTML = '🏠';
+                    homeButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#2c3e50" d="M12 3l10 9h-3v9h-6v-6h-2v6H5v-9H2z"/></svg>';
                     homeButton.title = 'Go to home position';
                     homeButton.href = '#';
                     homeButton.onclick = function(e) {
@@ -259,7 +259,7 @@
 
                     // Center on marker button
                     var centerButton = L.DomUtil.create('a', 'custom-control-button', container);
-                    centerButton.innerHTML = '🎯';
+                    centerButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#2c3e50" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 0 0 0 16 8 8 0 0 0 0-16zm1 4v5h4v2h-6V8h2z"/></svg>';
                     centerButton.title = 'Center on satellite';
                     centerButton.href = '#';
                     centerButton.onclick = function(e) {
@@ -272,7 +272,7 @@
 
                     // Clear path button
                     var clearButton = L.DomUtil.create('a', 'custom-control-button', container);
-                    clearButton.innerHTML = '✕';
+                    clearButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#2c3e50" d="M18.3 5.71L12 12.01 5.71 5.71 4.29 7.13 10.59 13.43 4.29 19.71 5.71 21.13 12 14.83l6.29 6.3 1.42-1.42-6.3-6.3 6.3-6.29z"/></svg>';
                     clearButton.title = 'Clear path';
                     clearButton.href = '#';
                     clearButton.style.fontWeight = 'bold';
@@ -285,7 +285,7 @@
 
                     // Measure distance button
                     var measureButton = L.DomUtil.create('a', 'custom-control-button', container);
-                    measureButton.innerHTML = '📏';
+                    measureButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#2c3e50" d="M3 16.5V21h4.5l12-12-4.5-4.5-12 12z"/></svg>';
                     measureButton.title = 'Measure distance';
                     measureButton.href = '#';
                     measureButton.onclick = function(e) {
@@ -312,46 +312,43 @@
 
             // Measurement functionality
             map.on('click', function(e) {
-                if (measureMode) {
-                    var marker = L.circleMarker(e.latlng, {
-                        radius: 5,
-                        color: '#ff0000',
-                        fillColor: '#ff0000',
-                        fillOpacity: 1
+                if (!measureMode) return;
+
+                const clickedLatLng = e.latlng;
+
+                const pointMarker = L.circleMarker(clickedLatLng, {
+                    radius: 5,
+                    color: '#e74c3c',
+                    fillColor: '#e74c3c',
+                    fillOpacity: 1
+                }).addTo(map);
+
+                measurePoints.push(pointMarker);
+
+                const latlngs = measurePoints.map(m => m.getLatLng());
+
+                // Draw or update the measure line
+                if (measureLine) {
+                    measureLine.setLatLngs(latlngs);
+                } else {
+                    measureLine = L.polyline(latlngs, {
+                        color: '#e74c3c',
+                        weight: 2,
+                        dashArray: '5, 5'
                     }).addTo(map);
-
-                    measurePoints.push(marker);
-
-                    if (measurePoints.length > 1) {
-                        var latlngs = measurePoints.map(function(m) {
-                            return m.getLatLng();
-                        });
-
-                        if (measureLine) {
-                            measureLine.setLatLngs(latlngs);
-                        } else {
-                            measureLine = L.polyline(latlngs, {
-                                color: '#ff0000',
-                                weight: 2,
-                                dashArray: '5, 10'
-                            }).addTo(map);
-                        }
-
-                        // Calculate total distance
-                        var totalDistance = 0;
-                        for (var i = 1; i < latlngs.length; i++) {
-                            totalDistance += latlngs[i-1].distanceTo(latlngs[i]);
-                        }
-
-                        // Show distance
-                        L.popup({
-                            className: 'measure-popup'
-                        })
-                            .setLatLng(e.latlng)
-                            .setContent('Distance: ' + (totalDistance / 1000).toFixed(2) + ' km')
-                            .openOn(map);
-                    }
                 }
+
+                // Calculate total distance in meters
+                let totalDistance = 0;
+                for (let i = 1; i < latlngs.length; i++) {
+                    totalDistance += latlngs[i - 1].distanceTo(latlngs[i]);
+                }
+
+                // Show popup near last clicked point
+                L.popup({ className: 'measure-popup' })
+                    .setLatLng(clickedLatLng)
+                    .setContent('Total Distance: ' + (totalDistance / 1000).toFixed(2) + ' km')
+                    .openOn(map);
             });
 
             // Create custom satellite icon
@@ -419,14 +416,20 @@
 
     function toggleMeasureMode() {
         measureMode = !measureMode;
-        if (!measureMode && measureLine) {
-            map.removeLayer(measureLine);
-            measurePoints.forEach(function(marker) {
-                map.removeLayer(marker);
-            });
+
+        if (!measureMode) {
+            if (measureLine) {
+                map.removeLayer(measureLine);
+                measureLine = null;
+            }
+
+            measurePoints.forEach(marker => map.removeLayer(marker));
             measurePoints = [];
-            measureLine = null;
+
+            // Remove existing popups if any
+            map.closePopup();
         }
+
         map.getContainer().style.cursor = measureMode ? 'crosshair' : '';
     }
 

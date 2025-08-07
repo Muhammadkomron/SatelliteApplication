@@ -10,14 +10,12 @@ import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.VBox;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
-import javafx.geometry.Insets;
 
 import com.example.satelliteapplication.manager.TelemetryManager;
 import com.example.satelliteapplication.manager.MapManager;
@@ -50,7 +48,7 @@ public class MainController implements Initializable {
     @FXML private Label telemetryStatus;
     @FXML private Label videoStatus;
 
-    // Telemetry Display - Updated fields
+    // Telemetry Display
     @FXML private VBox telemetryPanel;
     @FXML private VBox telemetryPlaceholder;
     @FXML private Label batteryVoltageLabel;
@@ -62,8 +60,6 @@ public class MainController implements Initializable {
     @FXML private Label armStatusLabel;
     @FXML private Label flightModeLabel;
     @FXML private Label satellitesLabel;
-
-    // New telemetry fields
     @FXML private Label missionTimeLabel;
     @FXML private Label pressureLabel;
     @FXML private Label verticalVelocityLabel;
@@ -75,17 +71,12 @@ public class MainController implements Initializable {
     @FXML private Label rollLabel;
     @FXML private Label yawLabel;
     @FXML private Label teamIdLabel;
-
-    // Static status fields
     @FXML private Label satelliteStatusLabel;
     @FXML private Label errorCodeLabel;
 
-    // Serial Monitor Components
-    @FXML private VBox serialMonitorContainer;
-    @FXML private Label serialMonitorTitle;
+    // Serial Monitor Components (from FXML)
     @FXML private ScrollPane serialScrollPane;
     @FXML private VBox serialMessageContainer;
-    @FXML private HBox serialInputContainer;
     @FXML private TextField serialInputField;
     @FXML private Button serialSendButton;
     @FXML private Button serialClearButton;
@@ -114,37 +105,21 @@ public class MainController implements Initializable {
     private static final String TEAM_ID = "569287";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private static final int MAX_SERIAL_MESSAGES = 100; // Maximum lines to keep in serial monitor
-
-    // Serial monitor messages
-    private List<SerialMessage> serialMessages = new ArrayList<>();
+    private static final int MAX_SERIAL_MESSAGES = 100;
 
     // Message types for serial monitor
     private enum MessageType {
-        RECEIVED("RX", "#2ecc71"),  // Green for received
-        SENT("TX", "#3498db"),       // Blue for sent
-        ERROR("ERR", "#e74c3c"),     // Red for errors
-        INFO("INFO", "#95a5a6");     // Gray for info
+        RECEIVED("RX", "serial-message-rx"),
+        SENT("TX", "serial-message-tx"),
+        ERROR("ERR", "serial-message-error"),
+        INFO("INFO", "serial-message-info");
 
         private final String prefix;
-        private final String color;
+        private final String styleClass;
 
-        MessageType(String prefix, String color) {
+        MessageType(String prefix, String styleClass) {
             this.prefix = prefix;
-            this.color = color;
-        }
-    }
-
-    // Serial message class
-    private static class SerialMessage {
-        private final String timestamp;
-        private final MessageType type;
-        private final String message;
-
-        SerialMessage(MessageType type, String message) {
-            this.timestamp = LocalTime.now().format(TIME_FORMATTER);
-            this.type = type;
-            this.message = message;
+            this.styleClass = styleClass;
         }
     }
 
@@ -173,9 +148,12 @@ public class MainController implements Initializable {
         videoCapture = new VideoCapture();
 
         // Set up telemetry callbacks
-        telemetryManager.setLogCallback(this::addSerialMessage);
+        telemetryManager.setLogCallback(this::handleTelemetryLog);
         telemetryManager.setDataUpdateCallback(this::updateTelemetryDisplay);
         telemetryManager.setDisconnectCallback(this::disconnectTelemetry);
+
+        // Initialize Serial Monitor
+        initializeSerialMonitor();
 
         // Create and configure ImageView for video display
         videoImageView = new ImageView();
@@ -189,9 +167,6 @@ public class MainController implements Initializable {
         videoRefreshBtn.setOnAction(e -> refreshVideoSources());
         videoConnectBtn.setOnAction(e -> toggleVideoConnection());
         videoExpandBtn.setOnAction(e -> toggleExternalVideo());
-
-        // Initialize Serial Monitor UI
-        initializeSerialMonitor();
 
         // Initially hide expand button
         videoExpandBtn.setVisible(false);
@@ -217,126 +192,40 @@ public class MainController implements Initializable {
         errorCodeLabel.setText("0000");
     }
 
+    // ============ SERIAL MONITOR METHODS ============
+
     private void initializeSerialMonitor() {
-        // Create UI components if they don't exist in FXML
-        if (serialMonitorContainer == null) {
-            serialMonitorContainer = new VBox(5);
-            serialMonitorContainer.setPadding(new Insets(10));
-            serialMonitorContainer.setStyle("-fx-background-color: #2c3e50; -fx-border-color: #34495e; -fx-border-radius: 5;");
-        }
+        // Set up event handlers
+        serialSendButton.setOnAction(e -> sendSerialCommand());
+        serialClearButton.setOnAction(e -> clearSerialMonitor());
 
-        if (serialMonitorTitle == null) {
-            serialMonitorTitle = new Label("Serial Monitor");
-            serialMonitorTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #ecf0f1;");
-            serialMonitorContainer.getChildren().add(serialMonitorTitle);
-        }
-
-        if (serialScrollPane == null) {
-            serialScrollPane = new ScrollPane();
-            serialScrollPane.setFitToWidth(true);
-            serialScrollPane.setPrefHeight(200);
-            serialScrollPane.setMinHeight(150);
-            serialScrollPane.setMaxHeight(300);
-            serialScrollPane.setStyle("-fx-background: #1e2329; -fx-background-color: #1e2329;");
-            VBox.setVgrow(serialScrollPane, Priority.ALWAYS);
-
-            serialMessageContainer = new VBox(2);
-            serialMessageContainer.setPadding(new Insets(5));
-            serialMessageContainer.setStyle("-fx-background-color: #1e2329;");
-            serialScrollPane.setContent(serialMessageContainer);
-
-            serialMonitorContainer.getChildren().add(serialScrollPane);
-        }
-
-        // Create input controls
-        if (serialInputContainer == null) {
-            serialInputContainer = new HBox(5);
-            serialInputContainer.setPadding(new Insets(5, 0, 0, 0));
-
-            serialInputField = new TextField();
-            serialInputField.setPromptText("Enter command to send...");
-            serialInputField.setStyle("-fx-background-color: #34495e; -fx-text-fill: #ecf0f1; -fx-prompt-text-fill: #7f8c8d;");
-            HBox.setHgrow(serialInputField, Priority.ALWAYS);
-
-            serialSendButton = new Button("Send");
-            serialSendButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white;");
-            serialSendButton.setOnAction(e -> sendSerialCommand());
-
-            serialClearButton = new Button("Clear");
-            serialClearButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
-            serialClearButton.setOnAction(e -> clearSerialMonitor());
-
-            serialInputContainer.getChildren().addAll(serialInputField, serialSendButton, serialClearButton);
-            serialMonitorContainer.getChildren().add(serialInputContainer);
-        }
-
-        // Set up keyboard shortcuts
+        // Handle Enter key in input field
         serialInputField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
                 sendSerialCommand();
             }
         });
 
-        // Initially disable input controls
-        updateSerialMonitorState(false);
-
         // Auto-scroll to bottom when new messages are added
-        serialMessageContainer.heightProperty().addListener((obs, oldVal, newVal) -> {
-            Platform.runLater(() -> serialScrollPane.setVvalue(1.0));
-        });
-    }
+        serialMessageContainer.heightProperty().addListener(
+                (obs, oldVal, newVal) -> Platform.runLater(() -> serialScrollPane.setVvalue(1.0))
+        );
 
-    private void addSerialMessage(String message) {
-        // Determine message type based on content
-        MessageType type = MessageType.RECEIVED;
-        if (message.startsWith("Sending:") || message.startsWith("TX:")) {
-            type = MessageType.SENT;
-        } else if (message.contains("Error") || message.contains("Failed")) {
-            type = MessageType.ERROR;
-        } else if (message.contains("Connected") || message.contains("Disconnected")) {
-            type = MessageType.INFO;
-        }
+        // Initially disable input controls
+        setSerialMonitorEnabled(false);
 
-        addSerialMessage(type, message);
-    }
-
-    private void addSerialMessage(MessageType type, String message) {
-        if (message == null || message.trim().isEmpty()) {
-            return; // Don't display empty messages
-        }
-
-        SerialMessage serialMsg = new SerialMessage(type, message);
-        serialMessages.add(serialMsg);
-
-        // Remove old messages if exceeding limit
-        while (serialMessages.size() > MAX_SERIAL_MESSAGES) {
-            serialMessages.remove(0);
-        }
-
-        Platform.runLater(() -> {
-            // Create message label
-            Label msgLabel = new Label(String.format("[%s] %s: %s",
-                    serialMsg.timestamp, type.prefix, serialMsg.message));
-            msgLabel.setStyle(String.format("-fx-font-family: 'Courier New', monospace; " +
-                    "-fx-font-size: 11px; -fx-text-fill: %s; -fx-wrap-text: true;", type.color));
-            msgLabel.setMaxWidth(Double.MAX_VALUE);
-
-            // Add to container
-            serialMessageContainer.getChildren().add(msgLabel);
-
-            // Remove old labels if exceeding limit
-            while (serialMessageContainer.getChildren().size() > MAX_SERIAL_MESSAGES) {
-                serialMessageContainer.getChildren().remove(0);
-            }
-
-            // Auto-scroll to bottom
-            serialScrollPane.setVvalue(1.0);
-        });
+        // Add initial info message
+        addSerialMessage(MessageType.INFO, "Serial monitor ready. Connect telemetry to start.");
     }
 
     private void sendSerialCommand() {
         String command = serialInputField.getText().trim();
-        if (command.isEmpty() || !telemetryManager.isConnected()) {
+        if (command.isEmpty()) {
+            return;
+        }
+
+        if (!telemetryManager.isConnected()) {
+            addSerialMessage(MessageType.ERROR, "Not connected to telemetry");
             return;
         }
 
@@ -352,29 +241,76 @@ public class MainController implements Initializable {
     }
 
     private void clearSerialMonitor() {
-        serialMessages.clear();
         Platform.runLater(() -> {
             serialMessageContainer.getChildren().clear();
             addSerialMessage(MessageType.INFO, "Serial monitor cleared");
         });
     }
 
-    private void updateSerialMonitorState(boolean connected) {
-        Platform.runLater(() -> {
-            serialInputField.setDisable(!connected);
-            serialSendButton.setDisable(!connected);
+    private void addSerialMessage(MessageType type, String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return;
+        }
 
-            if (connected) {
-                serialInputField.setPromptText("Enter command to send...");
-                addSerialMessage(MessageType.INFO, "Serial monitor connected");
+        Platform.runLater(() -> {
+            // Create timestamp
+            String timestamp = LocalTime.now().format(TIME_FORMATTER);
+
+            // Create message label
+            Label msgLabel = new Label(String.format("[%s] %s: %s",
+                    timestamp, type.prefix, message));
+            msgLabel.getStyleClass().add(type.styleClass);
+            msgLabel.setMaxWidth(Double.MAX_VALUE);
+            msgLabel.setWrapText(true);
+
+            // Add to container
+            serialMessageContainer.getChildren().add(msgLabel);
+
+            // Remove old messages if exceeding limit
+            while (serialMessageContainer.getChildren().size() > MAX_SERIAL_MESSAGES) {
+                serialMessageContainer.getChildren().remove(0);
+            }
+
+            // Auto-scroll to bottom
+            serialScrollPane.setVvalue(1.0);
+        });
+    }
+
+    private void handleTelemetryLog(String message) {
+        // Determine message type based on content
+        MessageType type = MessageType.RECEIVED;
+
+        if (message.startsWith("Sent:") || message.startsWith("Sending")) {
+            type = MessageType.SENT;
+        } else if (message.contains("Error") || message.contains("Failed")) {
+            type = MessageType.ERROR;
+        } else if (message.contains("Connected") || message.contains("Disconnected") ||
+                message.contains("Waiting") || message.contains("Requesting")) {
+            type = MessageType.INFO;
+        }
+
+        addSerialMessage(type, message);
+    }
+
+    private void setSerialMonitorEnabled(boolean enabled) {
+        Platform.runLater(() -> {
+            serialInputField.setDisable(!enabled);
+            serialSendButton.setDisable(!enabled);
+
+            if (enabled) {
+                serialInputField.setPromptText("Enter command...");
             } else {
-                serialInputField.setPromptText("Connect to enable sending...");
-                if (!serialMessages.isEmpty()) {
-                    addSerialMessage(MessageType.INFO, "Serial monitor disconnected");
+                serialInputField.setPromptText("Connect telemetry to enable...");
+
+                // Clear input if something was typed
+                if (!serialInputField.getText().isEmpty()) {
+                    serialInputField.clear();
                 }
             }
         });
     }
+
+    // ============ TELEMETRY METHODS ============
 
     private void initializeTelemetryFields() {
         LocalDateTime now = LocalDateTime.now();
@@ -389,13 +325,18 @@ public class MainController implements Initializable {
         gpsAltitudeLabel.setText("0.0 m");
         gpsLatitudeLabel.setText("0.000000");
         gpsLongitudeLabel.setText("0.000000");
+        altitudeLabel.setText("0.0 m");
+        speedLabel.setText("0.0 m/s");
+        satellitesLabel.setText("0");
+        flightModeLabel.setText("Unknown");
+        armStatusLabel.setText("DISARMED");
         pitchLabel.setText("0.0°");
         rollLabel.setText("0.0°");
         yawLabel.setText("0.0°");
     }
 
     private void updateTelemetryDisplay(TelemetryManager.TelemetryData data) {
-        // Battery - separate voltage and percentage
+        // Battery
         batteryVoltageLabel.setText(String.format("%.1fV", data.batteryVoltage));
         if (data.batteryPercentage >= 0) {
             batteryStatusLabel.setText(data.batteryPercentage + "%");
@@ -403,7 +344,7 @@ public class MainController implements Initializable {
             batteryStatusLabel.setText("N/A");
         }
 
-        // GPS - separate latitude and longitude
+        // GPS
         if (data.hasGpsFix) {
             gpsLatitudeLabel.setText(String.format("%.6f", data.latitude));
             gpsLongitudeLabel.setText(String.format("%.6f", data.longitude));
@@ -420,16 +361,14 @@ public class MainController implements Initializable {
         altitudeLabel.setText(String.format("%.1f m", data.altitude));
         speedLabel.setText(String.format("%.1f m/s", data.groundSpeed));
         verticalVelocityLabel.setText(String.format("%.2f m/s", data.verticalVelocity));
-
-        // Distance from home
         distanceLabel.setText(String.format("%.1f m", data.distanceFromHome));
 
         // Flight status
         flightModeLabel.setText(data.flightMode);
         armStatusLabel.setText(data.isArmed ? "ARMED" : "DISARMED");
-        armStatusLabel.setStyle(data.isArmed ? "-fx-text-fill: #e74c3c;" : "-fx-text-fill: #27ae60;");
+        armStatusLabel.setTextFill(data.isArmed ? Color.web("#e74c3c") : Color.web("#27ae60"));
 
-        // Attitude - individual labels
+        // Attitude
         rollLabel.setText(String.format("%.1f°", data.roll));
         pitchLabel.setText(String.format("%.1f°", data.pitch));
         yawLabel.setText(String.format("%.1f°", data.yaw));
@@ -439,12 +378,7 @@ public class MainController implements Initializable {
         internalTempLabel.setText(String.format("%.1f°C", data.internalTemp));
         externalTempLabel.setText(String.format("%.1f°C", data.externalTemp));
 
-        // Status message - add to serial monitor if not empty
-        if (data.statusMessage != null && !data.statusMessage.trim().isEmpty()) {
-            addSerialMessage(MessageType.RECEIVED, "STATUS: " + data.statusMessage);
-        }
-
-        // Update mission time with full date/time format
+        // Update mission time
         updateMissionTime();
 
         // Update map position
@@ -474,25 +408,8 @@ public class MainController implements Initializable {
             telemetryComboBox.getSelectionModel().select(0);
         }
 
-        addSerialMessage(MessageType.INFO, "Found " + telemetryComboBox.getItems().size() + " potential LR900 ports");
-    }
-
-    private void refreshVideoSources() {
-        List<VideoSource> sources = new ArrayList<>();
-
-        // Add camera options
-        sources.add(new VideoSource("Camera 0 (Built-in)", 0, VideoCapture.VideoSourceType.USB_CAMERA));
-        sources.add(new VideoSource("Camera 1 (USB)", 1, VideoCapture.VideoSourceType.USB_CAMERA));
-        sources.add(new VideoSource("Camera 2 (USB)", 2, VideoCapture.VideoSourceType.USB_CAMERA));
-        sources.add(new VideoSource("Camera 3 (HDMI)", 3, VideoCapture.VideoSourceType.USB_CAMERA));
-        sources.add(new VideoSource("Camera 4 (HDMI)", 4, VideoCapture.VideoSourceType.USB_CAMERA));
-
-        ObservableList<VideoSource> videoSources = FXCollections.observableArrayList(sources);
-        videoComboBox.setItems(videoSources);
-
-        if (!videoComboBox.getItems().isEmpty()) {
-            videoComboBox.getSelectionModel().select(0);
-        }
+        addSerialMessage(MessageType.INFO,
+                "Found " + telemetryComboBox.getItems().size() + " serial ports");
     }
 
     private void toggleTelemetryConnection() {
@@ -510,13 +427,18 @@ public class MainController implements Initializable {
             return;
         }
 
+        addSerialMessage(MessageType.INFO, "Connecting to " + selected.port.getSystemPortName() + "...");
+
         if (telemetryManager.connect(selected.port)) {
             Platform.runLater(() -> {
-                uiStateManager.updateTelemetryConnectionUI(true, telemetryStatus, telemetryConnectBtn, telemetryComboBox);
+                uiStateManager.updateTelemetryConnectionUI(true, telemetryStatus,
+                        telemetryConnectBtn, telemetryComboBox);
                 updateContentDisplay();
-                updateSerialMonitorState(true);
+                setSerialMonitorEnabled(true);
+                addSerialMessage(MessageType.INFO, "Telemetry connected successfully");
             });
         } else {
+            addSerialMessage(MessageType.ERROR, "Failed to connect to " + selected.port.getSystemPortName());
             showAlert("Failed to open port: " + selected.port.getSystemPortName());
         }
     }
@@ -525,10 +447,32 @@ public class MainController implements Initializable {
         telemetryManager.disconnect();
 
         Platform.runLater(() -> {
-            uiStateManager.updateTelemetryConnectionUI(false, telemetryStatus, telemetryConnectBtn, telemetryComboBox);
+            uiStateManager.updateTelemetryConnectionUI(false, telemetryStatus,
+                    telemetryConnectBtn, telemetryComboBox);
             updateContentDisplay();
-            updateSerialMonitorState(false);
+            setSerialMonitorEnabled(false);
+            addSerialMessage(MessageType.INFO, "Telemetry disconnected");
         });
+    }
+
+    // ============ VIDEO METHODS ============
+
+    private void refreshVideoSources() {
+        List<VideoSource> sources = new ArrayList<>();
+
+        // Add camera options
+        sources.add(new VideoSource("Camera 0 (Built-in)", 0, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("Camera 1 (USB)", 1, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("Camera 2 (USB)", 2, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("Camera 3 (HDMI)", 3, VideoCapture.VideoSourceType.USB_CAMERA));
+        sources.add(new VideoSource("Camera 4 (HDMI)", 4, VideoCapture.VideoSourceType.USB_CAMERA));
+
+        ObservableList<VideoSource> videoSources = FXCollections.observableArrayList(sources);
+        videoComboBox.setItems(videoSources);
+
+        if (!videoComboBox.getItems().isEmpty()) {
+            videoComboBox.getSelectionModel().select(0);
+        }
     }
 
     private void toggleVideoConnection() {
@@ -565,7 +509,7 @@ public class MainController implements Initializable {
                     videoContainer.getChildren().add(videoImageView);
 
                     updateContentDisplay();
-                    log("Connected to " + selectedSource.getName());
+                    addSerialMessage(MessageType.INFO, "Video connected: " + selectedSource.getName());
                 });
 
             } catch (Exception e) {
@@ -581,12 +525,8 @@ public class MainController implements Initializable {
                                 "Please try a different camera index.");
                         errorMessage = "Camera not available";
                     } else if (errorMessage.contains("permission")) {
-                        showAlert("Camera access denied.\n\n" +
-                                "Please grant camera permissions in System Preferences.");
+                        showAlert("Camera access denied.\n\nPlease grant camera permissions in System Preferences.");
                         errorMessage = "Permission denied";
-                    } else if (errorMessage.contains("Network sources")) {
-                        showAlert("Network sources are not yet implemented.");
-                        errorMessage = "Not implemented";
                     } else {
                         showAlert("Failed to connect:\n" + errorMessage);
                     }
@@ -594,7 +534,7 @@ public class MainController implements Initializable {
                     // Update UI state
                     uiStateManager.updateVideoConnectionError(errorMessage, videoStatus, videoConnectBtn);
                     videoComboBox.setDisable(false);
-                    log("Video connection failed: " + errorMessage);
+                    addSerialMessage(MessageType.ERROR, "Video connection failed: " + errorMessage);
                 });
             }
         }).start();
@@ -614,7 +554,7 @@ public class MainController implements Initializable {
         videoContainer.getChildren().add(placeholder);
 
         updateContentDisplay();
-        log("Video disconnected");
+        addSerialMessage(MessageType.INFO, "Video disconnected");
     }
 
     private void toggleExternalVideo() {
@@ -626,7 +566,7 @@ public class MainController implements Initializable {
     }
 
     private void expandVideoToNewWindow() {
-        if (uiStateManager.isVideoConnected() || videoStage != null) {
+        if (!uiStateManager.isVideoConnected() || videoStage != null) {
             return;
         }
 
@@ -708,6 +648,8 @@ public class MainController implements Initializable {
         }
     }
 
+    // ============ UTILITY METHODS ============
+
     private void updateContentDisplay() {
         uiStateManager.updateContentPanels(telemetryPanel, telemetryPlaceholder,
                 videoPanel, videoPlaceholder, mapPanel, mapPlaceholder);
@@ -716,11 +658,6 @@ public class MainController implements Initializable {
         if (uiStateManager.isTelemetryConnected()) {
             mapManager.forceResize();
         }
-    }
-
-    private void log(String message) {
-        String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-        System.out.println("[" + timestamp + "] " + message);
     }
 
     private void showAlert(String message) {
