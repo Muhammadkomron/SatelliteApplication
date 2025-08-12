@@ -71,6 +71,37 @@
                         </HBox>
                      </children>
                   </VBox>
+
+                  <!-- Separator -->
+                  <Separator styleClass="separator" />
+
+                  <!-- Log Viewer Section -->
+                  <VBox spacing="8.0">
+                     <children>
+                        <HBox alignment="CENTER_LEFT" spacing="12.0">
+                           <children>
+                              <Label styleClass="connection-label" text="Log Files" />
+                              <Button fx:id="openLogViewerBtn" mnemonicParsing="false" prefWidth="150.0"
+                                      styleClass="expand-button" text="Open Log Viewer">
+                                 <font>
+                                    <Font size="12.0" />
+                                 </font>
+                              </Button>
+                              <Label styleClass="info-label" text="View and analyze ArduPilot BIN log files" />
+                              <Region HBox.hgrow="ALWAYS" />
+                              <Button fx:id="downloadLogsBtn" mnemonicParsing="false" prefWidth="130.0"
+                                      styleClass="button" text="Download Logs">
+                                 <font>
+                                    <Font size="12.0" />
+                                 </font>
+                              </Button>
+                           </children>
+                           <VBox.margin>
+                              <Insets left="5.0" />
+                           </VBox.margin>
+                        </HBox>
+                     </children>
+                  </VBox>
                </children>
             </VBox>
          </children>

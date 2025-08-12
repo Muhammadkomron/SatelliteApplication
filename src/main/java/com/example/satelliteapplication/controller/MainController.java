@@ -13,6 +13,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
@@ -26,7 +27,12 @@ import com.example.satelliteapplication.service.VideoCapture.VideoSource;
 
 import com.fazecast.jSerialComm.SerialPort;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -34,8 +40,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
 
 public class MainController implements Initializable {
+
+    // Log File Controls
+    @FXML private Button openLogViewerBtn;
+    @FXML private Button downloadLogsBtn;
 
     // Connection Controls
     @FXML private ComboBox<SerialPortInfo> telemetryComboBox;
@@ -191,6 +202,124 @@ public class MainController implements Initializable {
         teamIdLabel.setText(TEAM_ID);
         satelliteStatusLabel.setText("0");
         errorCodeLabel.setText("0000");
+
+        // Initialize log file buttons
+        if (openLogViewerBtn != null) {
+            openLogViewerBtn.setOnAction(e -> openLogViewer());
+        }
+        if (downloadLogsBtn != null) {
+            downloadLogsBtn.setOnAction(e -> downloadLogsFromSD());
+        }
+    }
+
+    // ============ LOG FILE METHODS ============
+
+    private void initializeLogViewer() {
+        // Create a button for opening log viewer
+        Button openLogViewerBtn = new Button("Open Log Viewer");
+        openLogViewerBtn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;");
+        openLogViewerBtn.setPrefWidth(150);
+        openLogViewerBtn.setOnAction(e -> openLogViewer());
+
+        // Add the button to your UI - you can place it in the connection panel or create a new section
+        // For example, add it to the telemetry connection HBox:
+        // Find the telemetry connection HBox in your FXML and add this button
+    }
+
+    private void openLogViewer() {
+        Stage currentStage = (Stage) telemetryConnectBtn.getScene().getWindow();
+        LogFileController.showLogViewer(currentStage);
+    }
+
+    private void downloadLogsFromSD() {
+        if (!telemetryManager.isConnected()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Not Connected");
+            alert.setHeaderText(null);
+            alert.setContentText("Please connect to telemetry first to download logs from SD card.");
+            alert.showAndWait();
+            return;
+        }
+
+        // Choose directory to save logs
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Directory to Save Logs");
+        directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
+
+        File selectedDirectory = directoryChooser.showDialog(downloadLogsBtn.getScene().getWindow());
+        if (selectedDirectory != null) {
+            downloadLogsToDirectory(selectedDirectory);
+        }
+    }
+
+    private void downloadLogsToDirectory(File directory) {
+        // Create a progress dialog
+        Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+        progressAlert.setTitle("Downloading Logs");
+        progressAlert.setHeaderText("Downloading logs from SD card...");
+        progressAlert.setContentText("This may take a few minutes.");
+        progressAlert.getButtonTypes().clear();
+        progressAlert.show();
+
+        // In a real implementation, you would:
+        // 1. Send MAVLink commands to list logs
+        // 2. Download each log file
+        // 3. Save to the selected directory
+
+        // For now, show a placeholder implementation
+        new Thread(() -> {
+            try {
+                // Simulate download delay
+                Thread.sleep(2000);
+
+                Platform.runLater(() -> {
+                    progressAlert.close();
+
+                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                    successAlert.setTitle("Download Complete");
+                    successAlert.setHeaderText(null);
+                    successAlert.setContentText("Logs have been downloaded to:\n" + directory.getAbsolutePath());
+                    successAlert.showAndWait();
+
+                    // Optionally open the log viewer with the downloaded files
+                    askToOpenDownloadedLogs(directory);
+                });
+            } catch (InterruptedException e) {
+                Platform.runLater(() -> {
+                    progressAlert.close();
+                    showAlert("Download interrupted");
+                });
+            }
+        }).start();
+    }
+
+    private void askToOpenDownloadedLogs(File directory) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Open Log Viewer");
+        alert.setHeaderText(null);
+        alert.setContentText("Would you like to open the log viewer to analyze the downloaded logs?");
+
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                openLogViewer();
+                // You could also pass the directory path to the log viewer
+                // to automatically load the first log file
+            }
+        });
+    }
+
+    // Add this helper method to find log files in a directory
+    private List<File> findLogFiles(File directory) {
+        try {
+            return Files.walk(Paths.get(directory.getPath()))
+                    .filter(Files::isRegularFile)
+                    .map(Path::toFile)
+                    .filter(file -> file.getName().toLowerCase().endsWith(".bin"))
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
     }
 
     // ============ SERIAL MONITOR METHODS ============

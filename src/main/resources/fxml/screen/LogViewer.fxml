@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="600.0" minWidth="800.0"
+      prefHeight="800.0" prefWidth="1200.0" spacing="10.0"
+      stylesheets="@../../css/application.css"
+      xmlns="http://javafx.com/javafx/17"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.satelliteapplication.controller.LogFileController">
+    <children>
+        <!-- Header Section -->
+        <HBox alignment="CENTER_LEFT" spacing="15.0" styleClass="connection-box">
+            <children>
+                <Button fx:id="selectLogFileBtn" mnemonicParsing="false"
+                        prefWidth="150.0" styleClass="connect-button" text="Select Log File">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </Button>
+                <Label fx:id="logFileStatusLabel" styleClass="telemetry-value" text="No file selected">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </Label>
+                <Region HBox.hgrow="ALWAYS" />
+                <ProgressBar fx:id="loadingProgress" prefWidth="200.0" visible="false" />
+            </children>
+            <padding>
+                <Insets bottom="10.0" left="15.0" right="15.0" top="10.0" />
+            </padding>
+        </HBox>
+
+        <!-- Dashboard Container -->
+        <VBox fx:id="dashboardContainer" spacing="10.0" VBox.vgrow="ALWAYS">
+            <children>
+                <!-- Tab Pane for different views -->
+                <TabPane fx:id="logTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+                    <tabs>
+                        <!-- Tabs will be added programmatically -->
+                    </tabs>
+                </TabPane>
+            </children>
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" />
+            </padding>
+        </VBox>
+    </children>
+    <padding>
+        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+    </padding>
+</VBox>
