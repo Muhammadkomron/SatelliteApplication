@@ -87,7 +87,7 @@
                                     <Font size="12.0" />
                                  </font>
                               </Button>
-                              <Label styleClass="info-label" text="View and analyze ArduPilot BIN log files" />
+                              <Label styleClass="info-label" text="View and analyze log files" />
                               <Region HBox.hgrow="ALWAYS" />
                               <Button fx:id="downloadLogsBtn" mnemonicParsing="false" prefWidth="130.0"
                                       styleClass="button" text="Download Logs">

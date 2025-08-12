@@ -354,7 +354,6 @@ HBox, VBox, StackPane, GridPane {
     -fx-border-radius: 10;
     -fx-min-height: -1;
     -fx-pref-height: -1;
-    -fx-max-height: Double.MAX_VALUE;
 }
 
 .telemetry-panel GridPane {

@@ -167,7 +167,7 @@
     <div class="map-loading" id="loadingIndicator">Loading map...</div>
 </div>
 <div class="coordinate-display" id="coordinateDisplay">
-    Lat: <span id="latDisplay">41.2995</span> | Lon: <span id="lonDisplay">69.2401</span> | Zoom: <span id="zoomDisplay">15</span>
+    Lat: <span id="latDisplay">38.4013</span> | Lon: <span id="lonDisplay">34.0286</span> | Zoom: <span id="zoomDisplay">15</span>
 </div>
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 <script>
@@ -189,7 +189,8 @@
 
             // Create map instance
             map = L.map('map', {
-                center: [41.2995, 69.2401],
+                // center: [41.2995, 69.2401],
+                center: [38.4013, 34.0286],
                 zoom: 15,
                 zoomControl: false,
                 attributionControl: true
@@ -253,7 +254,7 @@
                     homeButton.href = '#';
                     homeButton.onclick = function(e) {
                         e.preventDefault();
-                        map.setView([41.2995, 69.2401], 15);
+                        map.setView([38.4013, 34.0286], 15);
                         return false;
                     };
 
@@ -384,7 +385,7 @@
             });
 
             // Add marker
-            marker = L.marker([41.2995, 69.2401], {
+            marker = L.marker([38.4013, 34.0286], {
                 icon: satelliteIcon
             }).addTo(map);
 

@@ -12,8 +12,10 @@ import java.nio.charset.StandardCharsets;
 public class MapManager {
     private WebEngine webEngine;
     private boolean mapInitialized = false;
-    private double currentLat = 41.2995;
-    private double currentLon = 69.2401;
+//    private double currentLat = 41.2995;
+//    private double currentLon = 69.2401;
+    private double currentLat = 38.401390;
+    private double currentLon = 34.028673;
     private double currentHeading = 0;
 
     public MapManager() {
@@ -98,7 +100,7 @@ public class MapManager {
 
                 // Force another resize and center
                 webEngine.executeScript("window.map.invalidateSize(true);");
-                webEngine.executeScript("window.map.setView([41.2995, 69.2401], 15);");
+                webEngine.executeScript("window.map.setView([38.4013, 34.0286], 15);");
 
                 // Clear any cached tiles
                 webEngine.executeScript("if (window.map._container) { window.map._container.style.background = '#f0f0f0'; }");

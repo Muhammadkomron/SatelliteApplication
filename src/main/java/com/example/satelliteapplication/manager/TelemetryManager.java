@@ -467,14 +467,14 @@ public class TelemetryManager {
 
         } else if (payload instanceof ScaledPressure pressure) {
             telemetryData.pressure = pressure.pressAbs();
-            telemetryData.externalTemp = pressure.temperature() / 100.0;
+            telemetryData.internalTemp = pressure.temperature() / 100.0;
 
         } else if (payload instanceof ScaledImu2 imu2) {
-            telemetryData.internalTemp = imu2.temperature() / 100.0;
+            telemetryData.externalTemp = imu2.temperature() / 100.0;
 
         } else if (payload instanceof HighresImu highres) {
             if (highres.temperature() != 0) {
-                telemetryData.internalTemp = highres.temperature();
+                telemetryData.externalTemp = highres.temperature();
             }
         }
 
