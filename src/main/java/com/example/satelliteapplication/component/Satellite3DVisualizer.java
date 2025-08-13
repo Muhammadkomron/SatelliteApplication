@@ -17,17 +17,9 @@ import javafx.scene.transform.Translate;
  */
 public class Satellite3DVisualizer extends Pane {
 
-    // 3D Scene components
-    private SubScene subScene;
     private Group root3D;
     private PerspectiveCamera camera;
 
-    // Satellite model
-    private Box satelliteBody;
-    private Group satelliteGroup;
-
-    // Reference axes
-    private Cylinder xAxis, yAxis, zAxis;
     private Group axesGroup;
 
     // Rotation transforms
@@ -69,7 +61,8 @@ public class Satellite3DVisualizer extends Pane {
         setupCamera();
 
         // Create SubScene for 3D content
-        subScene = new SubScene(root3D, 400, 300, true, SceneAntialiasing.BALANCED);
+        // 3D Scene components
+        SubScene subScene = new SubScene(root3D, 400, 300, true, SceneAntialiasing.BALANCED);
         subScene.setFill(Color.rgb(30, 30, 35)); // Dark background
         subScene.setCamera(camera);
 
@@ -94,7 +87,8 @@ public class Satellite3DVisualizer extends Pane {
 
     private void createSatelliteModel() {
         // Create main satellite body (rectangular box)
-        satelliteBody = new Box(100, 40, 60);
+        // Satellite model
+        Box satelliteBody = new Box(100, 40, 60);
 
         // Create material with metallic appearance
         PhongMaterial bodyMaterial = new PhongMaterial();
@@ -104,7 +98,7 @@ public class Satellite3DVisualizer extends Pane {
         satelliteBody.setMaterial(bodyMaterial);
 
         // Create satellite group with transformations
-        satelliteGroup = new Group();
+        Group satelliteGroup = new Group();
 
         // Add solar panels (simplified as flat boxes)
         Box leftPanel = new Box(150, 2, 40);
@@ -146,7 +140,8 @@ public class Satellite3DVisualizer extends Pane {
         axesGroup = new Group();
 
         // X-axis (Roll) - Red
-        xAxis = new Cylinder(1, 200);
+        // Reference axes
+        Cylinder xAxis = new Cylinder(1, 200);
         PhongMaterial xMaterial = new PhongMaterial();
         xMaterial.setDiffuseColor(Color.RED);
         xMaterial.setSpecularColor(Color.DARKRED);
@@ -155,14 +150,14 @@ public class Satellite3DVisualizer extends Pane {
         xAxis.setRotate(90);
 
         // Y-axis (Pitch) - Green
-        yAxis = new Cylinder(1, 200);
+        Cylinder yAxis = new Cylinder(1, 200);
         PhongMaterial yMaterial = new PhongMaterial();
         yMaterial.setDiffuseColor(Color.LIGHTGREEN);
         yMaterial.setSpecularColor(Color.DARKGREEN);
         yAxis.setMaterial(yMaterial);
 
         // Z-axis (Yaw) - Blue
-        zAxis = new Cylinder(1, 200);
+        Cylinder zAxis = new Cylinder(1, 200);
         PhongMaterial zMaterial = new PhongMaterial();
         zMaterial.setDiffuseColor(Color.LIGHTBLUE);
         zMaterial.setSpecularColor(Color.DARKBLUE);
@@ -305,5 +300,13 @@ public class Satellite3DVisualizer extends Pane {
      */
     public double getCurrentYaw() {
         return currentYaw;
+    }
+
+    public boolean isShowLabels() {
+        return showLabels;
+    }
+
+    public void setShowLabels(boolean showLabels) {
+        this.showLabels = showLabels;
     }
 }

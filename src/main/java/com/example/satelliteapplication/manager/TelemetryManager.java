@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 public class TelemetryManager {
-    // Connection components
     private SerialPort serialPort;
     private MavlinkConnection mavlinkConnection;
     private Thread readThread;
@@ -37,13 +36,22 @@ public class TelemetryManager {
     private final AtomicLong packetCounter = new AtomicLong(0);
     private final AtomicLong lastSequenceNumber = new AtomicLong(-1);
 
-    // Telemetry data
+    // ADD: Connection state tracking
+    private boolean hasReceivedData = false;
+    private long lastDataReceivedTime = 0;
+    private static final long DATA_TIMEOUT_MS = 10000; // 10 seconds timeout
+
+    // Telemetry data - PERSISTENT
     private final TelemetryData telemetryData = new TelemetryData();
+
+    // ADD: Last known good data
+    private final TelemetryData lastKnownGoodData = new TelemetryData();
 
     // Callbacks
     private Consumer<String> logCallback;
     private Consumer<TelemetryData> dataUpdateCallback;
     private Runnable disconnectCallback;
+    private Consumer<Boolean> dataAvailabilityCallback; // NEW: callback for data availability status
 
     // Helper class for telemetry data
     public static class TelemetryData {
@@ -79,13 +87,47 @@ public class TelemetryManager {
         public long totalPackets = 0;
         public int currentSequence = 0;
 
+        // ADD: Data availability flag
+        public boolean isDataAvailable = false;
+        public boolean isStale = false; // Indicates if data is old but still displayed
+
         // GPS status
         public boolean hasValidPosition() {
             return latitude != 0 && longitude != 0;
         }
+
+        // Method to copy data
+        public void copyFrom(TelemetryData other) {
+            this.batteryVoltage = other.batteryVoltage;
+            this.batteryPercentage = other.batteryPercentage;
+            this.latitude = other.latitude;
+            this.longitude = other.longitude;
+            this.altitude = other.altitude;
+            this.gpsAltitude = other.gpsAltitude;
+            this.groundSpeed = other.groundSpeed;
+            this.verticalVelocity = other.verticalVelocity;
+            this.satellites = other.satellites;
+            this.hasGpsFix = other.hasGpsFix;
+            this.flightMode = other.flightMode;
+            this.isArmed = other.isArmed;
+            this.roll = other.roll;
+            this.pitch = other.pitch;
+            this.yaw = other.yaw;
+            this.pressure = other.pressure;
+            this.internalTemp = other.internalTemp;
+            this.externalTemp = other.externalTemp;
+            this.distanceFromHome = other.distanceFromHome;
+            this.statusMessage = other.statusMessage;
+            this.totalPackets = other.totalPackets;
+            this.currentSequence = other.currentSequence;
+            this.isDataAvailable = other.isDataAvailable;
+            this.isStale = other.isStale;
+        }
     }
 
     public TelemetryManager() {
+        // Start monitoring thread for data availability
+        scheduler.scheduleAtFixedRate(this::checkDataAvailability, 1, 1, TimeUnit.SECONDS);
     }
 
     public void setLogCallback(Consumer<String> callback) {
@@ -100,6 +142,41 @@ public class TelemetryManager {
         this.disconnectCallback = callback;
     }
 
+    private void checkDataAvailability() {
+        if (isRunning.get() && hasReceivedData) {
+            long timeSinceLastData = System.currentTimeMillis() - lastDataReceivedTime;
+
+            if (timeSinceLastData > DATA_TIMEOUT_MS) {
+                if (telemetryData.isDataAvailable) {
+                    telemetryData.isDataAvailable = false;
+                    telemetryData.isStale = true;
+
+                    Platform.runLater(() -> {
+                        log("Data stream timeout - displaying last known values");
+                        if (dataAvailabilityCallback != null) {
+                            dataAvailabilityCallback.accept(false);
+                        }
+                    });
+                }
+            } else if (!telemetryData.isDataAvailable && hasReceivedData) {
+                telemetryData.isDataAvailable = true;
+                telemetryData.isStale = false;
+
+                Platform.runLater(() -> {
+                    log("Data stream restored");
+                    if (dataAvailabilityCallback != null) {
+                        dataAvailabilityCallback.accept(true);
+                    }
+                });
+            }
+        }
+    }
+
+    // NEW: Set callback for data availability changes
+    public void setDataAvailabilityCallback(Consumer<Boolean> callback) {
+        this.dataAvailabilityCallback = callback;
+    }
+
     public boolean connect(SerialPort port) {
         if (isRunning.get()) {
             disconnect();
@@ -107,9 +184,11 @@ public class TelemetryManager {
 
         this.serialPort = port;
 
-        // Reset packet counters
+        // Reset packet counters but NOT telemetry data
         packetCounter.set(0);
         lastSequenceNumber.set(-1);
+        hasReceivedData = false;
+        lastDataReceivedTime = System.currentTimeMillis();
 
         // Configure for LR900 defaults
         serialPort.setBaudRate(57600);
@@ -152,6 +231,10 @@ public class TelemetryManager {
         log("Connected to " + serialPort.getSystemPortName() + " at 57600 baud");
         log("Waiting for MAVLink data...");
 
+        // Mark data as potentially stale until we receive new data
+        telemetryData.isStale = true;
+        telemetryData.isDataAvailable = false;
+
         // Request data streams
         scheduler.schedule(this::requestDataStreams, 2, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(this::requestDataStreams, 2, 5, TimeUnit.SECONDS);
@@ -175,7 +258,17 @@ public class TelemetryManager {
         }
 
         outputStream = null;
-        log("Disconnected");
+
+        // Mark data as stale but don't clear it
+        telemetryData.isStale = true;
+        telemetryData.isDataAvailable = false;
+
+        // Notify about data unavailability
+        if (dataAvailabilityCallback != null) {
+            Platform.runLater(() -> dataAvailabilityCallback.accept(false));
+        }
+
+        log("Disconnected - keeping last known telemetry values");
     }
 
     /**
@@ -339,10 +432,27 @@ public class TelemetryManager {
                 if (message != null) {
                     timeoutCount = 0;
 
+                    // Mark that we've received data
+                    if (!hasReceivedData) {
+                        hasReceivedData = true;
+                        telemetryData.isDataAvailable = true;
+                        telemetryData.isStale = false;
+                        log("MAVLink data stream established");
+
+                        if (dataAvailabilityCallback != null) {
+                            Platform.runLater(() -> dataAvailabilityCallback.accept(true));
+                        }
+                    }
+
+                    lastDataReceivedTime = System.currentTimeMillis();
+
                     // Track packet sequence
                     trackPacketSequence(message);
 
                     handleMavlinkMessage(message);
+
+                    // Save good data
+                    lastKnownGoodData.copyFrom(telemetryData);
                 }
             } catch (IOException e) {
                 if (isRunning.get()) {
@@ -351,21 +461,27 @@ public class TelemetryManager {
                         timeoutCount++;
                         if (timeoutCount >= MAX_TIMEOUTS) {
                             Platform.runLater(() -> {
-                                log("No MAVLink data received. Check connection.");
-                                if (disconnectCallback != null) {
-                                    disconnectCallback.run();
+                                log("No MAVLink data received - keeping last known values");
+                                telemetryData.isStale = true;
+                                telemetryData.isDataAvailable = false;
+
+                                if (dataAvailabilityCallback != null) {
+                                    dataAvailabilityCallback.accept(false);
                                 }
+
+                                // Don't disconnect automatically - let user decide
+                                // if (disconnectCallback != null) {
+                                //     disconnectCallback.run();
+                                // }
                             });
-                            break;
+                            // Don't break - keep trying to read
+                            timeoutCount = 0; // Reset to keep trying
                         }
                     } else {
                         Platform.runLater(() -> {
-                            log("Read error: " + errorMsg);
-                            if (disconnectCallback != null) {
-                                disconnectCallback.run();
-                            }
+                            log("Read error: " + errorMsg + " - maintaining connection");
+                            // Don't auto-disconnect on errors
                         });
-                        break;
                     }
                 }
             }
@@ -483,10 +599,6 @@ public class TelemetryManager {
 
         // Log received message type (but not every message to avoid spam)
         String msgType = payload.getClass().getSimpleName();
-        if (!msgType.equals("Heartbeat") && !msgType.equals("Attitude")) {
-            // Include packet info in log for debugging
-            // log(String.format("Received: %s (seq: %d)", msgType, message.getSequence()));
-        }
 
         // Notify callback
         if (dataUpdateCallback != null) {
@@ -595,6 +707,14 @@ public class TelemetryManager {
 
     public boolean isConnected() {
         return isRunning.get();
+    }
+
+    public boolean isDataAvailable() {
+        return telemetryData.isDataAvailable;
+    }
+
+    public boolean isDataStale() {
+        return telemetryData.isStale;
     }
 
     public long getTotalPackets() {

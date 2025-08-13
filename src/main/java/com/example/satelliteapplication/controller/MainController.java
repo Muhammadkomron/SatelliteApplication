@@ -91,6 +91,7 @@ public class MainController implements Initializable {
     @FXML private Label satelliteStatusLabel;
     @FXML private Label errorCodeLabel;
     @FXML private Label packetCountLabel;
+    @FXML private HBox errorCodeContainer;
 
     // 3D Orientation Controls
     @FXML private StackPane satellite3DContainer;
@@ -114,6 +115,8 @@ public class MainController implements Initializable {
     private Stage videoStage;
     private ImageView externalVideoImageView;
     private boolean isExternalVideoMode = false;
+    private boolean isReceivingTelemetryData = false;
+    private Label dataStatusIndicator; // Optional: visual indicator for data status
 
     // Map Display
     @FXML private VBox mapPanel;
@@ -146,7 +149,7 @@ public class MainController implements Initializable {
      * 1. Ground Station Communication (Index 0):
      *    - 0 (Green): Communication established
      *    - 1 (Red): Communication not established
-     * 
+     *
      * 2. Payload Position Data (Index 1):
      *    - 0 (Green): Position data obtained
      *    - 1 (Red): Position data cannot be obtained
@@ -171,22 +174,6 @@ public class MainController implements Initializable {
     // ===================================
     // ENUMS AND HELPER CLASSES
     // ===================================
-
-    // Message types for serial monitor
-    private enum MessageType {
-        RECEIVED("RX", "serial-message-rx"),
-        SENT("TX", "serial-message-tx"),
-        ERROR("ERR", "serial-message-error"),
-        INFO("INFO", "serial-message-info");
-
-        private final String prefix;
-        private final String styleClass;
-
-        MessageType(String prefix, String styleClass) {
-            this.prefix = prefix;
-            this.styleClass = styleClass;
-        }
-    }
 
     // Helper class for serial port display
     private static class SerialPortInfo {
@@ -235,7 +222,10 @@ public class MainController implements Initializable {
     private void initializeTelemetryCallbacks() {
         telemetryManager.setLogCallback(this::handleTelemetryLog);
         telemetryManager.setDataUpdateCallback(this::updateTelemetryDisplay);
-        telemetryManager.setDisconnectCallback(this::disconnectTelemetry);
+        telemetryManager.setDisconnectCallback(this::handleTelemetryDisconnect); // Modified
+
+        // ADD: Set data availability callback
+        telemetryManager.setDataAvailabilityCallback(this::handleDataAvailability);
     }
 
     private void initializeVideoImageView() {
@@ -306,14 +296,6 @@ public class MainController implements Initializable {
         }
     }
 
-    private void initializeErrorCodes() {
-        // Initialize all error codes to 0 (green)
-        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
-            errorCodes[i] = 0;
-        }
-        updateErrorCodeDisplay();
-    }
-
     // ===================================
     // ERROR CODE MANAGEMENT METHODS
     // ===================================
@@ -323,39 +305,78 @@ public class MainController implements Initializable {
      * 0 = Green (success), 1 = Red (error)
      */
     private void updateErrorCodeDisplay() {
-        StringBuilder displayText = new StringBuilder();
-        
+        // Clear existing display
+        errorCodeContainer.getChildren().clear();
+
+        // Create individual digit displays
         for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
-            displayText.append(errorCodes[i]);
-        }
-        
-        errorCodeLabel.setText(displayText.toString());
-        
-        // Apply color coding based on error codes using CSS classes
-        errorCodeLabel.getStyleClass().removeAll("error-state", "success-state");
-        
-        if (errorCodes[GROUND_STATION_COMMUNICATION] == 0) {
-            errorCodeLabel.getStyleClass().add("success-state");
-        } else {
-            errorCodeLabel.getStyleClass().add("error-state");
+            Label digitLabel = new Label(String.valueOf(errorCodes[i]));
+
+            // Apply styling for each digit
+            digitLabel.setStyle(
+                    "-fx-font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;" +
+                            "-fx-font-size: 16px;" +
+                            "-fx-font-weight: bold;" +
+                            "-fx-padding: 4 6;" +
+                            "-fx-background-radius: 4;" +
+                            "-fx-border-radius: 4;" +
+                            "-fx-border-width: 1;" +
+                            "-fx-min-width: 20;" +
+                            "-fx-alignment: center;" +
+                            getDigitStyle(errorCodes[i])
+            );
+
+            errorCodeContainer.getChildren().add(digitLabel);
         }
     }
 
+    private String getDigitStyle(int value) {
+        if (value == 0) {
+            // Green for success
+            return "-fx-text-fill: #27ae60;" +
+                    "-fx-background-color: #d5f4e6;" +
+                    "-fx-border-color: #27ae60;";
+        } else {
+            // Red for error
+            return "-fx-text-fill: #e74c3c;" +
+                    "-fx-background-color: #fadbd8;" +
+                    "-fx-border-color: #e74c3c;";
+        }
+    }
+
+    /**
+     * Initialize error codes - Updated version
+     */
+    private void initializeErrorCodes() {
+        // Initialize all error codes to 0 (green)
+        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
+            errorCodes[i] = 0;
+        }
+
+        // Create the error code container if it doesn't exist
+        if (errorCodeContainer == null) {
+            errorCodeContainer = new HBox(2); // 2px spacing between digits
+            errorCodeContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        }
+
+        updateErrorCodeDisplay();
+    }
+
+    /**
+     * Sets the payload position data error code - FIXED to always show green
+     * @param hasPositionData true if position data is obtained, false otherwise
+     */
+    public void setPayloadPositionDataStatus(boolean hasPositionData) {
+        // Always set to 0 (green) for the second digit as requested
+        errorCodes[PAYLOAD_POSITION_DATA] = 0; // Always green
+        updateErrorCodeDisplay();
+    }
     /**
      * Sets the ground station communication error code
      * @param hasCommunication true if communication is established, false otherwise
      */
     public void setGroundStationCommunicationStatus(boolean hasCommunication) {
         errorCodes[GROUND_STATION_COMMUNICATION] = hasCommunication ? 0 : 1;
-        updateErrorCodeDisplay();
-    }
-
-    /**
-     * Sets the payload position data error code
-     * @param hasPositionData true if position data is obtained, false otherwise
-     */
-    public void setPayloadPositionDataStatus(boolean hasPositionData) {
-        errorCodes[PAYLOAD_POSITION_DATA] = hasPositionData ? 0 : 1;
         updateErrorCodeDisplay();
     }
 
@@ -604,43 +625,69 @@ public class MainController implements Initializable {
     // ===================================
 
     private void updateTelemetryDisplay(TelemetryManager.TelemetryData data) {
-        updateBatteryData(data);
-        updateGpsData(data);
-        updateFlightData(data);
+        // Add visual indicator if data is stale
+        String staleSuffix = data.isStale ? " (old)" : "";
+
+        updateBatteryData(data, staleSuffix);
+        updateGpsData(data, staleSuffix);
+        updateFlightData(data, staleSuffix);
         updateAttitudeData(data);
-        updateEnvironmentalData(data);
+        updateEnvironmentalData(data, staleSuffix);
         updatePacketData(data);
         updateMissionTime();
         updateMapPosition(data);
-        
+
         // Update error codes based on data availability
         updateErrorCodesFromData(data);
     }
 
-    private void updateBatteryData(TelemetryManager.TelemetryData data) {
-        batteryVoltageLabel.setText(String.format("%.1fV", data.batteryVoltage));
+    private void updateBatteryData(TelemetryManager.TelemetryData data, String staleSuffix) {
+        batteryVoltageLabel.setText(String.format("%.1fV%s", data.batteryVoltage, staleSuffix));
         if (data.batteryPercentage >= 0) {
-            batteryStatusLabel.setText(data.batteryPercentage + "%");
+            batteryStatusLabel.setText(data.batteryPercentage + "%" + staleSuffix);
         } else {
             batteryStatusLabel.setText("N/A");
         }
-    }
 
-    private void updateGpsData(TelemetryManager.TelemetryData data) {
-        if (data.hasGpsFix) {
-            gpsLatitudeLabel.setText(String.format("%.6f", data.latitude));
-            gpsLongitudeLabel.setText(String.format("%.6f", data.longitude));
-            satellitesLabel.setText(String.valueOf(data.satellites));
-            gpsAltitudeLabel.setText(String.format("%.1f m", data.gpsAltitude));
+        // Change color if data is stale
+        if (data.isStale) {
+            batteryVoltageLabel.setStyle("-fx-text-fill: #7f8c8d;"); // Gray for stale
+            batteryStatusLabel.setStyle("-fx-text-fill: #7f8c8d;");
         } else {
-            gpsLatitudeLabel.setText("No Fix");
-            gpsLongitudeLabel.setText("No Fix");
-            satellitesLabel.setText(data.satellites + " (no fix)");
-            gpsAltitudeLabel.setText("No GPS");
+            batteryVoltageLabel.setStyle("-fx-text-fill: #27ae60;"); // Normal color
+            batteryStatusLabel.setStyle("-fx-text-fill: #27ae60;");
         }
     }
 
-    private void updateFlightData(TelemetryManager.TelemetryData data) {
+    private void updateGpsData(TelemetryManager.TelemetryData data, String staleSuffix) {
+        if (data.hasGpsFix) {
+            gpsLatitudeLabel.setText(String.format("%.6f%s", data.latitude, staleSuffix));
+            gpsLongitudeLabel.setText(String.format("%.6f%s", data.longitude, staleSuffix));
+            satellitesLabel.setText(data.satellites + staleSuffix);
+            gpsAltitudeLabel.setText(String.format("%.1f m%s", data.gpsAltitude, staleSuffix));
+        } else {
+            gpsLatitudeLabel.setText("No Fix" + staleSuffix);
+            gpsLongitudeLabel.setText("No Fix" + staleSuffix);
+            satellitesLabel.setText(data.satellites + " (no fix)" + staleSuffix);
+            gpsAltitudeLabel.setText("No GPS" + staleSuffix);
+        }
+
+        // Apply stale styling
+        if (data.isStale) {
+            gpsLatitudeLabel.setStyle("-fx-text-fill: #7f8c8d;");
+            gpsLongitudeLabel.setStyle("-fx-text-fill: #7f8c8d;");
+            satellitesLabel.setStyle("-fx-text-fill: #7f8c8d;");
+            gpsAltitudeLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        } else {
+            // Reset to normal colors
+            gpsLatitudeLabel.setStyle("");
+            gpsLongitudeLabel.setStyle("");
+            satellitesLabel.setStyle("");
+            gpsAltitudeLabel.setStyle("");
+        }
+    }
+
+    private void updateFlightData(TelemetryManager.TelemetryData data, String staleSuffix) {
         altitudeLabel.setText(String.format("%.1f m", data.altitude));
         speedLabel.setText(String.format("%.1f m/s", data.groundSpeed));
         verticalVelocityLabel.setText(String.format("%.2f m/s", data.verticalVelocity));
@@ -658,10 +705,20 @@ public class MainController implements Initializable {
         updateSatellite3DOrientation(data.pitch, data.roll, data.yaw);
     }
 
-    private void updateEnvironmentalData(TelemetryManager.TelemetryData data) {
-        pressureLabel.setText(String.format("%.1f hPa", data.pressure));
-        internalTempLabel.setText(String.format("%.1f°C", data.internalTemp));
-        externalTempLabel.setText(String.format("%.1f°C", data.externalTemp));
+    private void updateEnvironmentalData(TelemetryManager.TelemetryData data, String staleSuffix) {
+        pressureLabel.setText(String.format("%.1f hPa%s", data.pressure, staleSuffix));
+        internalTempLabel.setText(String.format("%.1f°C%s", data.internalTemp, staleSuffix));
+        externalTempLabel.setText(String.format("%.1f°C%s", data.externalTemp, staleSuffix));
+
+        if (data.isStale) {
+            pressureLabel.setStyle("-fx-text-fill: #7f8c8d;");
+            internalTempLabel.setStyle("-fx-text-fill: #7f8c8d;");
+            externalTempLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        } else {
+            pressureLabel.setStyle("");
+            internalTempLabel.setStyle("");
+            externalTempLabel.setStyle("");
+        }
     }
 
     private void updatePacketData(TelemetryManager.TelemetryData data) {
@@ -756,13 +813,20 @@ public class MainController implements Initializable {
         Platform.runLater(() -> {
             uiStateManager.updateTelemetryConnectionUI(false, telemetryStatus,
                     telemetryConnectBtn, telemetryComboBox);
-            updateContentDisplay();
-            setSerialMonitorEnabled(false);
-            addSerialMessage(MessageType.INFO, "Telemetry disconnected");
 
-            if (satellite3DViewer != null) {
-                satellite3DViewer.reset();
+            // DON'T hide telemetry panel - keep showing last values
+            // Just update the status
+            if (telemetryStatus != null) {
+                telemetryStatus.setText("● Disconnected (Last Values)");
             }
+
+            setSerialMonitorEnabled(false);
+            addSerialMessage(MessageType.INFO, "Telemetry disconnected - keeping last known values");
+
+            // Don't reset 3D viewer - keep last orientation
+            // if (satellite3DViewer != null) {
+            //     satellite3DViewer.reset();
+            // }
         });
     }
 
@@ -941,12 +1005,108 @@ public class MainController implements Initializable {
     // UTILITY METHODS
     // ===================================
 
-    private void updateContentDisplay() {
-        uiStateManager.updateContentPanels(telemetryPanel, telemetryPlaceholder,
-                videoPanel, videoPlaceholder, mapPanel, mapPlaceholder);
+    private void handleDataAvailability(boolean isAvailable) {
+        isReceivingTelemetryData = isAvailable;
 
-        if (uiStateManager.isTelemetryConnected()) {
-            mapManager.forceResize();
+        Platform.runLater(() -> {
+            if (isAvailable) {
+                // Data is flowing
+                addSerialMessage(MessageType.INFO, "Telemetry data stream active");
+
+                // Update error codes to show communication is good
+                setGroundStationCommunicationStatus(true);
+
+                // Optional: Update visual indicator
+                if (telemetryStatus != null) {
+                    telemetryStatus.setText("● Connected (Live)");
+                    telemetryStatus.getStyleClass().clear();
+                    telemetryStatus.getStyleClass().add("status-connected");
+                }
+            } else {
+                // Data not flowing but connection still active
+                addSerialMessage(MessageType.WARNING, "No telemetry data - displaying last known values");
+
+                // Update error codes to show communication issue
+                setGroundStationCommunicationStatus(false);
+
+                // Optional: Update visual indicator
+                if (telemetryStatus != null) {
+                    telemetryStatus.setText("● Connected (No Data)");
+                    telemetryStatus.getStyleClass().clear();
+                    telemetryStatus.getStyleClass().add("status-connecting"); // Orange color
+                }
+            }
+        });
+    }
+
+    private void handleTelemetryDisconnect() {
+        // This is called when telemetry has issues
+        // Don't auto-disconnect, just notify user
+        Platform.runLater(() -> {
+            addSerialMessage(MessageType.WARNING, "Telemetry connection issue detected");
+            // Don't call disconnectTelemetry() automatically
+        });
+    }
+
+    private void updateContentDisplay() {
+        // Modified to always show telemetry panel if connected, regardless of data availability
+        boolean showTelemetry = uiStateManager.isTelemetryConnected();
+
+        if (showTelemetry) {
+            telemetryPanel.setVisible(true);
+            telemetryPanel.setManaged(true);
+            telemetryPlaceholder.setVisible(false);
+            telemetryPlaceholder.setManaged(false);
+
+            // Also show map when telemetry is connected
+            mapPanel.setVisible(true);
+            mapPanel.setManaged(true);
+            mapPlaceholder.setVisible(false);
+            mapPlaceholder.setManaged(false);
+
+            if (uiStateManager.isTelemetryConnected()) {
+                mapManager.forceResize();
+            }
+        } else {
+            telemetryPanel.setVisible(false);
+            telemetryPanel.setManaged(false);
+            telemetryPlaceholder.setVisible(true);
+            telemetryPlaceholder.setManaged(true);
+
+            // Hide map when telemetry is disconnected
+            mapPanel.setVisible(false);
+            mapPanel.setManaged(false);
+            mapPlaceholder.setVisible(true);
+            mapPlaceholder.setManaged(true);
+        }
+
+        // Video panel management remains the same
+        if (uiStateManager.isVideoConnected()) {
+            videoPanel.setVisible(true);
+            videoPanel.setManaged(true);
+            videoPlaceholder.setVisible(false);
+            videoPlaceholder.setManaged(false);
+        } else {
+            videoPanel.setVisible(false);
+            videoPanel.setManaged(false);
+            videoPlaceholder.setVisible(true);
+            videoPlaceholder.setManaged(true);
+        }
+    }
+
+    private enum MessageType {
+        RECEIVED("RX", "serial-message-rx"),
+        SENT("TX", "serial-message-tx"),
+        ERROR("ERR", "serial-message-error"),
+        INFO("INFO", "serial-message-info"),
+        WARNING("WARN", "serial-message-warning"); // ADD THIS
+
+        private final String prefix;
+        private final String styleClass;
+
+        MessageType(String prefix, String styleClass) {
+            this.prefix = prefix;
+            this.styleClass = styleClass;
         }
     }
 
