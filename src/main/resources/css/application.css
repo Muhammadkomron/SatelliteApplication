@@ -57,8 +57,8 @@ HBox, VBox, StackPane, GridPane {
 
 .content-area {
     -fx-background-color: #ffffff;
-    -fx-background-radius: 10;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 10, 0, 0, 2);
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 8, 0, 0, 2);
 }
 
 /* ===================================
@@ -66,9 +66,9 @@ HBox, VBox, StackPane, GridPane {
    =================================== */
 .connection-box {
     -fx-background-color: #ffffff;
-    -fx-padding: 10;
-    -fx-background-radius: 10;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 10, 0, 0, 2);
+    -fx-padding: 6;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 8, 0, 0, 2);
 }
 
 .connection-box HBox,
@@ -102,7 +102,7 @@ HBox, VBox, StackPane, GridPane {
     -fx-font-size: 16px;
     -fx-text-fill: #2c3e50;
     -fx-font-weight: bold;
-    -fx-padding: 0 0 10 0;
+    -fx-padding: 0 0 6 0;
 }
 
 /* Status Labels */
@@ -123,6 +123,35 @@ HBox, VBox, StackPane, GridPane {
 
 .status-connecting {
     -fx-text-fill: #f39c12;
+}
+
+/* ===================================
+   ERROR CODE DISPLAY - ENHANCED STYLING
+   =================================== */
+#errorCodeLabel {
+    -fx-font-family: "SF Mono", "Consolas", "Monaco", monospace;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 8;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-width: 2;
+    -fx-min-width: 60;
+    -fx-pref-width: 65;
+    -fx-alignment: center;
+}
+
+/* Error code states */
+#errorCodeLabel.error-state {
+    -fx-text-fill: #e74c3c;
+    -fx-background-color: #fadbd8;
+    -fx-border-color: #e74c3c;
+}
+
+#errorCodeLabel.success-state {
+    -fx-text-fill: #27ae60;
+    -fx-background-color: #d5f4e6;
+    -fx-border-color: #27ae60;
 }
 
 /* ===================================
@@ -239,7 +268,7 @@ HBox, VBox, StackPane, GridPane {
     -fx-background-color: #3498db;
     -fx-text-fill: #ffffff;
     -fx-background-radius: 6;
-    -fx-padding: 10 20;
+    -fx-padding: 8 16;
     -fx-cursor: hand;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 5, 0, 0, 2);
 }
@@ -295,7 +324,7 @@ HBox, VBox, StackPane, GridPane {
     -fx-border-width: 2;
     -fx-background-radius: 6;
     -fx-border-radius: 6;
-    -fx-padding: 9 12;
+    -fx-padding: 8 10;
     -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-text-fill: #2c3e50;
@@ -322,7 +351,7 @@ HBox, VBox, StackPane, GridPane {
 .expand-button {
     -fx-background-color: #9b59b6;
     -fx-text-fill: #ffffff;
-    -fx-padding: 8 16;
+    -fx-padding: 6 14;
     -fx-font-size: 14px;
     -fx-font-weight: 600;
     -fx-background-radius: 6;
@@ -346,55 +375,83 @@ HBox, VBox, StackPane, GridPane {
 
 /* Telemetry grid */
 .telemetry-grid {
-    -fx-padding: 16;
+    -fx-padding: 12;
     -fx-background-color: #f8f9fa;
-    -fx-background-radius: 10;
+    -fx-background-radius: 8;
     -fx-border-color: -fx-border-light;
     -fx-border-width: 1;
-    -fx-border-radius: 10;
+    -fx-border-radius: 8;
     -fx-min-height: -1;
     -fx-pref-height: -1;
 }
 
 .telemetry-panel GridPane {
-    -fx-hgap: 35;
-    -fx-vgap: 14;
+    -fx-hgap: 30;
+    -fx-vgap: 12;
 }
 
 .telemetry-label {
     -fx-text-fill: -fx-text-secondary;
-    -fx-font-size: 13px;
+    -fx-font-size: 12px;
     -fx-font-weight: 600;
-    -fx-min-width: 130;
-    -fx-pref-width: 140;
+    -fx-min-width: 120;
+    -fx-pref-width: 130;
     -fx-opacity: 0.85;
 }
 
 .telemetry-value {
     -fx-font-family: "SF Mono", "Consolas", "Monaco", monospace;
     -fx-text-fill: -fx-primary;
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
     -fx-font-weight: 700;
-    -fx-min-width: 100;
+    -fx-min-width: 90;
     -fx-background-color: transparent;
-    -fx-padding: 4 8;
+    -fx-padding: 3 6;
     -fx-background-radius: 4;
 }
 
 /* Special telemetry values with color coding */
 #teamIdLabel,
 #satelliteStatusLabel,
-#errorCodeLabel,
 #missionTimeLabel {
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
     -fx-font-weight: 700;
     -fx-text-fill: #8b44ad;
+}
+
+/* ===================================
+   ERROR CODE DISPLAY - ENHANCED STYLING
+   =================================== */
+#errorCodeLabel {
+    -fx-font-family: "SF Mono", "Consolas", "Monaco", monospace;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 8;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-width: 2;
+    -fx-min-width: 60;
+    -fx-pref-width: 65;
+    -fx-alignment: center;
+}
+
+/* Error code states */
+#errorCodeLabel.error-state {
+    -fx-text-fill: #e74c3c;
+    -fx-background-color: #fadbd8;
+    -fx-border-color: #e74c3c;
+}
+
+#errorCodeLabel.success-state {
+    -fx-text-fill: #27ae60;
+    -fx-background-color: #d5f4e6;
+    -fx-border-color: #27ae60;
 }
 
 #batteryVoltageLabel,
 #batteryStatusLabel {
     -fx-text-fill: -fx-success;
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
 }
 
 .battery-warning {
@@ -428,7 +485,7 @@ HBox, VBox, StackPane, GridPane {
     -fx-border-width: 2;
     -fx-border-radius: 6;
     -fx-background-radius: 6;
-    -fx-padding: 8 12;
+    -fx-padding: 6 10;
     -fx-font-family: "Courier New", monospace;
     -fx-font-size: 14px;
     -fx-font-weight: 600;
@@ -448,7 +505,7 @@ HBox, VBox, StackPane, GridPane {
 .serial-send-button,
 .serial-clear-button {
     -fx-cursor: hand;
-    -fx-padding: 8 15;
+    -fx-padding: 6 12;
     -fx-border-radius: 6;
     -fx-background-radius: 6;
     -fx-font-weight: bold;
@@ -494,8 +551,8 @@ HBox, VBox, StackPane, GridPane {
 /* Serial message styles */
 .serial-message-container {
     -fx-background-color: #f8f9fa;
-    -fx-padding: 10;
-    -fx-spacing: 3;
+    -fx-padding: 8;
+    -fx-spacing: 2;
 }
 
 .serial-message-rx,
@@ -503,7 +560,7 @@ HBox, VBox, StackPane, GridPane {
 .serial-message-error,
 .serial-message-info {
     -fx-font-family: "Consolas", "Monaco", "Courier New", monospace;
-    -fx-font-size: 13px;
+    -fx-font-size: 12px;
     -fx-wrap-text: true;
 }
 
@@ -536,8 +593,8 @@ HBox, VBox, StackPane, GridPane {
 
 .video-container {
     -fx-background-color: #000000;
-    -fx-background-radius: 8;
-    -fx-min-height: 200;
+    -fx-background-radius: 6;
+    -fx-min-height: 180;
 }
 
 /* ===================================
@@ -552,13 +609,13 @@ HBox, VBox, StackPane, GridPane {
    =================================== */
 .web-view {
     -fx-background-color: transparent;
-    -fx-border-radius: 10;
+    -fx-border-radius: 8;
 }
 
 WebView {
     -fx-background-color: white;
-    -fx-min-height: 400;
-    -fx-border-radius: 10;
+    -fx-min-height: 350;
+    -fx-border-radius: 8;
 }
 
 /* ===================================
@@ -600,8 +657,8 @@ WebView {
     -fx-border-color: #e9ecef;
     -fx-border-radius: 6;
     -fx-background-radius: 6;
-    -fx-min-height: 200;
-    -fx-pref-height: 300;
+    -fx-min-height: 180;
+    -fx-pref-height: 250;
     -fx-border-width: 1;
 }
 
@@ -640,7 +697,7 @@ WebView {
 }
 
 .telemetry-panel .separator {
-    -fx-padding: 10 0;
+    -fx-padding: 6 0;
 }
 
 .telemetry-panel .separator .line {

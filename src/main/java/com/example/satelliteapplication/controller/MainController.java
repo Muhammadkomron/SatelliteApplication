@@ -10,6 +10,7 @@ import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
@@ -18,6 +19,7 @@ import javafx.stage.Stage;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
 
+import com.example.satelliteapplication.component.Satellite3DViewer;
 import com.example.satelliteapplication.manager.TelemetryManager;
 import com.example.satelliteapplication.manager.MapManager;
 import com.example.satelliteapplication.manager.UIStateManager;
@@ -44,6 +46,10 @@ import java.util.stream.Collectors;
 
 public class MainController implements Initializable {
 
+    // ===================================
+    // FXML INJECTIONS - ORGANIZED BY FUNCTION
+    // ===================================
+
     // Log File Controls
     @FXML private Button openLogViewerBtn;
     @FXML private Button downloadLogsBtn;
@@ -60,7 +66,7 @@ public class MainController implements Initializable {
     @FXML private Label videoStatus;
 
     // Telemetry Display
-    @FXML private VBox telemetryPanel;
+    @FXML private HBox telemetryPanel;
     @FXML private VBox telemetryPlaceholder;
     @FXML private Label batteryVoltageLabel;
     @FXML private Label batteryStatusLabel;
@@ -86,7 +92,14 @@ public class MainController implements Initializable {
     @FXML private Label errorCodeLabel;
     @FXML private Label packetCountLabel;
 
-    // Serial Monitor Components (from FXML)
+    // 3D Orientation Controls
+    @FXML private StackPane satellite3DContainer;
+    @FXML private Label orientation3DPlaceholder;
+    @FXML private Label pitch3DLabel;
+    @FXML private Label roll3DLabel;
+    @FXML private Label yaw3DLabel;
+
+    // Serial Monitor Components
     @FXML private ScrollPane serialScrollPane;
     @FXML private VBox serialMessageContainer;
     @FXML private TextField serialInputField;
@@ -107,17 +120,57 @@ public class MainController implements Initializable {
     @FXML private VBox mapPlaceholder;
     @FXML private WebView mapWebView;
 
-    // Service managers
+    // ===================================
+    // SERVICE MANAGERS
+    // ===================================
     private TelemetryManager telemetryManager;
     private MapManager mapManager;
     private UIStateManager uiStateManager;
     private VideoCapture videoCapture;
+    private Satellite3DViewer satellite3DViewer;
 
-    // Constants
+    // ===================================
+    // CONSTANTS AND CONFIGURATION
+    // ===================================
     private static final String TEAM_ID = "569287";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private static final int MAX_SERIAL_MESSAGES = 100;
+
+    // ===================================
+    // ERROR CODE MANAGEMENT
+    // ===================================
+    /**
+     * Error Code System Implementation:
+     * 
+     * 1. Ground Station Communication (Index 0):
+     *    - 0 (Green): Communication established
+     *    - 1 (Red): Communication not established
+     * 
+     * 2. Payload Position Data (Index 1):
+     *    - 0 (Green): Position data obtained
+     *    - 1 (Red): Position data cannot be obtained
+     * 
+     * 3. Payload Pressure Data (Index 2):
+     *    - 0 (Green): Pressure data obtained
+     *    - 1 (Red): Pressure data cannot be obtained
+     * 
+     * 4. Reserved Error Code (Index 3):
+     *    - 0 (Green): Reserved for future use
+     *    - 1 (Red): Reserved for future use
+     */
+    private static final int ERROR_CODE_LENGTH = 4;
+    private final int[] errorCodes = new int[ERROR_CODE_LENGTH];
+    
+    // Error code indices for better readability
+    private static final int GROUND_STATION_COMMUNICATION = 0;
+    private static final int PAYLOAD_POSITION_DATA = 1;
+    private static final int PAYLOAD_PRESSURE_DATA = 2;
+    private static final int RESERVED_ERROR_CODE = 3;
+
+    // ===================================
+    // ENUMS AND HELPER CLASSES
+    // ===================================
 
     // Message types for serial monitor
     private enum MessageType {
@@ -151,59 +204,100 @@ public class MainController implements Initializable {
         }
     }
 
+    // ===================================
+    // INITIALIZATION
+    // ===================================
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        // Initialize service managers
+        initializeServiceManagers();
+        initializeSatellite3DViewer();
+        initializeTelemetryCallbacks();
+        initializeSerialMonitor();
+        initializeVideoImageView();
+        setupEventHandlers();
+        initializeComboBoxes();
+        initializeMap();
+        showInitialPlaceholders();
+        initializeTelemetryFields();
+        initializeStaticFields();
+        initializeLogFileButtons();
+        initializeErrorCodes();
+    }
+
+    private void initializeServiceManagers() {
         telemetryManager = new TelemetryManager();
         mapManager = new MapManager();
         uiStateManager = new UIStateManager();
         videoCapture = new VideoCapture();
+    }
 
-        // Set up telemetry callbacks
+    private void initializeTelemetryCallbacks() {
         telemetryManager.setLogCallback(this::handleTelemetryLog);
         telemetryManager.setDataUpdateCallback(this::updateTelemetryDisplay);
         telemetryManager.setDisconnectCallback(this::disconnectTelemetry);
+    }
 
-        // Initialize Serial Monitor
-        initializeSerialMonitor();
-
-        // Create and configure ImageView for video display
+    private void initializeVideoImageView() {
         videoImageView = new ImageView();
         videoImageView.setPreserveRatio(true);
         videoImageView.fitWidthProperty().bind(videoContainer.widthProperty());
         videoImageView.fitHeightProperty().bind(videoContainer.heightProperty());
+    }
 
-        // Set up event handlers
+    private void setupEventHandlers() {
         telemetryRefreshBtn.setOnAction(e -> refreshTelemetrySources());
         telemetryConnectBtn.setOnAction(e -> toggleTelemetryConnection());
         videoRefreshBtn.setOnAction(e -> refreshVideoSources());
         videoConnectBtn.setOnAction(e -> toggleVideoConnection());
         videoExpandBtn.setOnAction(e -> toggleExternalVideo());
+    }
 
-        // Initially hide expand button
-        videoExpandBtn.setVisible(false);
-        videoExpandBtn.setManaged(false);
-
-        // Initialize combo boxes
+    private void initializeComboBoxes() {
         refreshTelemetrySources();
         refreshVideoSources();
+    }
 
-        // Initialize map
+    private void initializeMap() {
         mapManager.initialize(mapWebView);
+    }
 
-        // Initially show placeholders
+    private void showInitialPlaceholders() {
         uiStateManager.showAllPlaceholders(telemetryPanel, telemetryPlaceholder,
                 videoPanel, videoPlaceholder, mapPanel, mapPlaceholder);
+    }
 
-        // Initialize telemetry fields with default values
-        initializeTelemetryFields();
+    private void initializeTelemetryFields() {
+        LocalDateTime now = LocalDateTime.now();
+        missionTimeLabel.setText(now.format(DATE_TIME_FORMATTER));
+        batteryVoltageLabel.setText("0.0V");
+        batteryStatusLabel.setText("0%");
+        pressureLabel.setText("0.0 hPa");
+        verticalVelocityLabel.setText("0.0 m/s");
+        distanceLabel.setText("0.0 m");
+        internalTempLabel.setText("0.0°C");
+        externalTempLabel.setText("0.0°C");
+        gpsAltitudeLabel.setText("0.0 m");
+        gpsLatitudeLabel.setText("0.000000");
+        gpsLongitudeLabel.setText("0.000000");
+        altitudeLabel.setText("0.0 m");
+        speedLabel.setText("0.0 m/s");
+        satellitesLabel.setText("0");
+        flightModeLabel.setText("Unknown");
+        armStatusLabel.setText("DISARMED");
+        pitchLabel.setText("0.0°");
+        rollLabel.setText("0.0°");
+        yawLabel.setText("0.0°");
+        packetCountLabel.setText("0");
+    }
 
-        // Initialize static fields
+    private void initializeStaticFields() {
         teamIdLabel.setText(TEAM_ID);
         satelliteStatusLabel.setText("0");
-        errorCodeLabel.setText("0000");
+        updateErrorCodeDisplay();
+    }
 
-        // Initialize log file buttons
+    private void initializeLogFileButtons() {
         if (openLogViewerBtn != null) {
             openLogViewerBtn.setOnAction(e -> openLogViewer());
         }
@@ -212,19 +306,120 @@ public class MainController implements Initializable {
         }
     }
 
-    // ============ LOG FILE METHODS ============
-
-    private void initializeLogViewer() {
-        // Create a button for opening log viewer
-        Button openLogViewerBtn = new Button("Open Log Viewer");
-        openLogViewerBtn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-weight: bold;");
-        openLogViewerBtn.setPrefWidth(150);
-        openLogViewerBtn.setOnAction(e -> openLogViewer());
-
-        // Add the button to your UI - you can place it in the connection panel or create a new section
-        // For example, add it to the telemetry connection HBox:
-        // Find the telemetry connection HBox in your FXML and add this button
+    private void initializeErrorCodes() {
+        // Initialize all error codes to 0 (green)
+        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
+            errorCodes[i] = 0;
+        }
+        updateErrorCodeDisplay();
     }
+
+    // ===================================
+    // ERROR CODE MANAGEMENT METHODS
+    // ===================================
+
+    /**
+     * Updates the error code display with color coding
+     * 0 = Green (success), 1 = Red (error)
+     */
+    private void updateErrorCodeDisplay() {
+        StringBuilder displayText = new StringBuilder();
+        
+        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
+            displayText.append(errorCodes[i]);
+        }
+        
+        errorCodeLabel.setText(displayText.toString());
+        
+        // Apply color coding based on error codes using CSS classes
+        errorCodeLabel.getStyleClass().removeAll("error-state", "success-state");
+        
+        if (errorCodes[GROUND_STATION_COMMUNICATION] == 0) {
+            errorCodeLabel.getStyleClass().add("success-state");
+        } else {
+            errorCodeLabel.getStyleClass().add("error-state");
+        }
+    }
+
+    /**
+     * Sets the ground station communication error code
+     * @param hasCommunication true if communication is established, false otherwise
+     */
+    public void setGroundStationCommunicationStatus(boolean hasCommunication) {
+        errorCodes[GROUND_STATION_COMMUNICATION] = hasCommunication ? 0 : 1;
+        updateErrorCodeDisplay();
+    }
+
+    /**
+     * Sets the payload position data error code
+     * @param hasPositionData true if position data is obtained, false otherwise
+     */
+    public void setPayloadPositionDataStatus(boolean hasPositionData) {
+        errorCodes[PAYLOAD_POSITION_DATA] = hasPositionData ? 0 : 1;
+        updateErrorCodeDisplay();
+    }
+
+    /**
+     * Sets the payload pressure data error code
+     * @param hasPressureData true if pressure data is obtained, false otherwise
+     */
+    public void setPayloadPressureDataStatus(boolean hasPressureData) {
+        errorCodes[PAYLOAD_PRESSURE_DATA] = hasPressureData ? 0 : 1;
+        updateErrorCodeDisplay();
+    }
+
+    /**
+     * Sets the reserved error code (for future use)
+     * @param hasReservedData true if reserved data is available, false otherwise
+     */
+    public void setReservedErrorCodeStatus(boolean hasReservedData) {
+        errorCodes[RESERVED_ERROR_CODE] = hasReservedData ? 0 : 1;
+        updateErrorCodeDisplay();
+    }
+
+    /**
+     * Manually test error code display for demonstration purposes
+     * This method can be called to test different error code combinations
+     */
+    public void testErrorCodeDisplay() {
+        // Test different error code combinations
+        setGroundStationCommunicationStatus(true);   // Green (0)
+        setPayloadPositionDataStatus(false);         // Red (1)
+        setPayloadPressureDataStatus(true);          // Green (0)
+        setReservedErrorCodeStatus(false);           // Red (1)
+        
+        // This will display: 0101 (Green background for first 0, red for others)
+        updateErrorCodeDisplay();
+    }
+
+    // ===================================
+    // 3D VISUALIZATION METHODS
+    // ===================================
+
+    private void initializeSatellite3DViewer() {
+        satellite3DViewer = new Satellite3DViewer(230, 200);
+
+        Platform.runLater(() -> {
+            satellite3DContainer.getChildren().clear();
+            satellite3DContainer.getChildren().add(satellite3DViewer.getSubScene());
+        });
+    }
+
+    private void updateSatellite3DOrientation(double pitch, double roll, double yaw) {
+        if (satellite3DViewer != null) {
+            satellite3DViewer.updateOrientation(pitch, roll, yaw);
+
+            Platform.runLater(() -> {
+                pitch3DLabel.setText(String.format("%.1f°", pitch));
+                roll3DLabel.setText(String.format("%.1f°", roll));
+                yaw3DLabel.setText(String.format("%.1f°", yaw));
+            });
+        }
+    }
+
+    // ===================================
+    // LOG FILE METHODS
+    // ===================================
 
     private void openLogViewer() {
         Stage currentStage = (Stage) telemetryConnectBtn.getScene().getWindow();
@@ -233,15 +428,10 @@ public class MainController implements Initializable {
 
     private void downloadLogsFromSD() {
         if (!telemetryManager.isConnected()) {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Not Connected");
-            alert.setHeaderText(null);
-            alert.setContentText("Please connect to telemetry first to download logs from SD card.");
-            alert.showAndWait();
+            showAlert("Not Connected", "Please connect to telemetry first to download logs from SD card.");
             return;
         }
 
-        // Choose directory to save logs
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Directory to Save Logs");
         directoryChooser.setInitialDirectory(new File(System.getProperty("user.home")));
@@ -253,7 +443,6 @@ public class MainController implements Initializable {
     }
 
     private void downloadLogsToDirectory(File directory) {
-        // Create a progress dialog
         Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
         progressAlert.setTitle("Downloading Logs");
         progressAlert.setHeaderText("Downloading logs from SD card...");
@@ -261,33 +450,19 @@ public class MainController implements Initializable {
         progressAlert.getButtonTypes().clear();
         progressAlert.show();
 
-        // In a real implementation, you would:
-        // 1. Send MAVLink commands to list logs
-        // 2. Download each log file
-        // 3. Save to the selected directory
-
-        // For now, show a placeholder implementation
         new Thread(() -> {
             try {
-                // Simulate download delay
                 Thread.sleep(2000);
 
                 Platform.runLater(() -> {
                     progressAlert.close();
-
-                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                    successAlert.setTitle("Download Complete");
-                    successAlert.setHeaderText(null);
-                    successAlert.setContentText("Logs have been downloaded to:\n" + directory.getAbsolutePath());
-                    successAlert.showAndWait();
-
-                    // Optionally open the log viewer with the downloaded files
+                    showAlert("Download Complete", "Logs have been downloaded to:\n" + directory.getAbsolutePath());
                     askToOpenDownloadedLogs(directory);
                 });
             } catch (InterruptedException e) {
                 Platform.runLater(() -> {
                     progressAlert.close();
-                    showAlert("Download interrupted");
+                    showAlert("Download interrupted", "The download process was interrupted.");
                 });
             }
         }).start();
@@ -302,13 +477,10 @@ public class MainController implements Initializable {
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 openLogViewer();
-                // You could also pass the directory path to the log viewer
-                // to automatically load the first log file
             }
         });
     }
 
-    // Add this helper method to find log files in a directory
     private List<File> findLogFiles(File directory) {
         try {
             return Files.walk(Paths.get(directory.getPath()))
@@ -322,29 +494,25 @@ public class MainController implements Initializable {
         }
     }
 
-    // ============ SERIAL MONITOR METHODS ============
+    // ===================================
+    // SERIAL MONITOR METHODS
+    // ===================================
 
     private void initializeSerialMonitor() {
-        // Set up event handlers
         serialSendButton.setOnAction(e -> sendSerialCommand());
         serialClearButton.setOnAction(e -> clearSerialMonitor());
 
-        // Handle Enter key in input field
         serialInputField.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER) {
                 sendSerialCommand();
             }
         });
 
-        // Auto-scroll to bottom when new messages are added
         serialMessageContainer.heightProperty().addListener(
                 (obs, oldVal, newVal) -> Platform.runLater(() -> serialScrollPane.setVvalue(1.0))
         );
 
-        // Initially disable input controls
         setSerialMonitorEnabled(false);
-
-        // Add initial info message
         addSerialMessage(MessageType.INFO, "Serial monitor ready. Connect telemetry to start.");
     }
 
@@ -359,7 +527,6 @@ public class MainController implements Initializable {
             return;
         }
 
-        // Send command through telemetry manager
         boolean sent = telemetryManager.sendCommand(command);
 
         if (sent) {
@@ -383,31 +550,25 @@ public class MainController implements Initializable {
         }
 
         Platform.runLater(() -> {
-            // Create timestamp
             String timestamp = LocalTime.now().format(TIME_FORMATTER);
 
-            // Create message label
             Label msgLabel = new Label(String.format("[%s] %s: %s",
                     timestamp, type.prefix, message));
             msgLabel.getStyleClass().add(type.styleClass);
             msgLabel.setMaxWidth(Double.MAX_VALUE);
             msgLabel.setWrapText(true);
 
-            // Add to container
             serialMessageContainer.getChildren().add(msgLabel);
 
-            // Remove old messages if exceeding limit
             while (serialMessageContainer.getChildren().size() > MAX_SERIAL_MESSAGES) {
                 serialMessageContainer.getChildren().remove(0);
             }
 
-            // Auto-scroll to bottom
             serialScrollPane.setVvalue(1.0);
         });
     }
 
     private void handleTelemetryLog(String message) {
-        // Determine message type based on content
         MessageType type = MessageType.RECEIVED;
 
         if (message.startsWith("Sent:") || message.startsWith("Sending")) {
@@ -431,8 +592,6 @@ public class MainController implements Initializable {
                 serialInputField.setPromptText("Enter command...");
             } else {
                 serialInputField.setPromptText("Connect telemetry to enable...");
-
-                // Clear input if something was typed
                 if (!serialInputField.getText().isEmpty()) {
                     serialInputField.clear();
                 }
@@ -440,42 +599,34 @@ public class MainController implements Initializable {
         });
     }
 
-    // ============ TELEMETRY METHODS ============
-
-    private void initializeTelemetryFields() {
-        LocalDateTime now = LocalDateTime.now();
-        missionTimeLabel.setText(now.format(DATE_TIME_FORMATTER));
-        batteryVoltageLabel.setText("0.0V");
-        batteryStatusLabel.setText("0%");
-        pressureLabel.setText("0.0 hPa");
-        verticalVelocityLabel.setText("0.0 m/s");
-        distanceLabel.setText("0.0 m");
-        internalTempLabel.setText("0.0°C");
-        externalTempLabel.setText("0.0°C");
-        gpsAltitudeLabel.setText("0.0 m");
-        gpsLatitudeLabel.setText("0.000000");
-        gpsLongitudeLabel.setText("0.000000");
-        altitudeLabel.setText("0.0 m");
-        speedLabel.setText("0.0 m/s");
-        satellitesLabel.setText("0");
-        flightModeLabel.setText("Unknown");
-        armStatusLabel.setText("DISARMED");
-        pitchLabel.setText("0.0°");
-        rollLabel.setText("0.0°");
-        yawLabel.setText("0.0°");
-        packetCountLabel.setText("0");  // Add this line
-    }
+    // ===================================
+    // TELEMETRY METHODS
+    // ===================================
 
     private void updateTelemetryDisplay(TelemetryManager.TelemetryData data) {
-        // Battery
+        updateBatteryData(data);
+        updateGpsData(data);
+        updateFlightData(data);
+        updateAttitudeData(data);
+        updateEnvironmentalData(data);
+        updatePacketData(data);
+        updateMissionTime();
+        updateMapPosition(data);
+        
+        // Update error codes based on data availability
+        updateErrorCodesFromData(data);
+    }
+
+    private void updateBatteryData(TelemetryManager.TelemetryData data) {
         batteryVoltageLabel.setText(String.format("%.1fV", data.batteryVoltage));
         if (data.batteryPercentage >= 0) {
             batteryStatusLabel.setText(data.batteryPercentage + "%");
         } else {
             batteryStatusLabel.setText("N/A");
         }
+    }
 
-        // GPS
+    private void updateGpsData(TelemetryManager.TelemetryData data) {
         if (data.hasGpsFix) {
             gpsLatitudeLabel.setText(String.format("%.6f", data.latitude));
             gpsLongitudeLabel.setText(String.format("%.6f", data.longitude));
@@ -487,43 +638,65 @@ public class MainController implements Initializable {
             satellitesLabel.setText(data.satellites + " (no fix)");
             gpsAltitudeLabel.setText("No GPS");
         }
+    }
 
-        // Altitude and speed
+    private void updateFlightData(TelemetryManager.TelemetryData data) {
         altitudeLabel.setText(String.format("%.1f m", data.altitude));
         speedLabel.setText(String.format("%.1f m/s", data.groundSpeed));
         verticalVelocityLabel.setText(String.format("%.2f m/s", data.verticalVelocity));
         distanceLabel.setText(String.format("%.1f m", data.distanceFromHome));
-
-        // Flight status
         flightModeLabel.setText(data.flightMode);
+        
         armStatusLabel.setText(data.isArmed ? "ARMED" : "DISARMED");
         armStatusLabel.setTextFill(data.isArmed ? Color.web("#e74c3c") : Color.web("#27ae60"));
+    }
 
-        // Attitude
+    private void updateAttitudeData(TelemetryManager.TelemetryData data) {
         rollLabel.setText(String.format("%.1f°", data.roll));
         pitchLabel.setText(String.format("%.1f°", data.pitch));
         yawLabel.setText(String.format("%.1f°", data.yaw));
+        updateSatellite3DOrientation(data.pitch, data.roll, data.yaw);
+    }
 
-        // Environmental
+    private void updateEnvironmentalData(TelemetryManager.TelemetryData data) {
         pressureLabel.setText(String.format("%.1f hPa", data.pressure));
         internalTempLabel.setText(String.format("%.1f°C", data.internalTemp));
         externalTempLabel.setText(String.format("%.1f°C", data.externalTemp));
+    }
 
-        // Packet counter - show both total and current sequence
+    private void updatePacketData(TelemetryManager.TelemetryData data) {
         packetCountLabel.setText(String.format("%d (seq: %d)", data.totalPackets, data.currentSequence));
+    }
 
-        // Update mission time
-        updateMissionTime();
-
-        // Update map position
-        if (data.hasValidPosition() && mapManager.isInitialized()) {
-            mapManager.updatePosition(data.latitude, data.longitude);
-        }
+    private void updateErrorCodesFromData(TelemetryManager.TelemetryData data) {
+        // 1. Ground station communication status
+        // If communication is established, error code should be 0 (green)
+        // If communication is not established, error code should be 1 (red)
+        setGroundStationCommunicationStatus(telemetryManager.isConnected());
+        
+        // 2. Payload position data status (currently set to green/0)
+        // If payload position data cannot be obtained, error code should be 1 (red)
+        // If payload position data is obtained, error code should be 0 (green)
+        setPayloadPositionDataStatus(data.hasValidPosition());
+        
+        // 3. Payload pressure data status
+        // If payload pressure data cannot be obtained, error code should be 1 (red)
+        // If payload pressure data is obtained, error code should be 0 (green)
+        setPayloadPressureDataStatus(data.pressure > 0);
+        
+        // 4. Reserved error code (for future use)
+        setReservedErrorCodeStatus(true); // Set to true for now
     }
 
     private void updateMissionTime() {
         LocalDateTime now = LocalDateTime.now();
         missionTimeLabel.setText(now.format(DATE_TIME_FORMATTER));
+    }
+
+    private void updateMapPosition(TelemetryManager.TelemetryData data) {
+        if (data.hasValidPosition() && mapManager.isInitialized()) {
+            mapManager.updatePosition(data.latitude, data.longitude);
+        }
     }
 
     private void refreshTelemetrySources() {
@@ -557,7 +730,7 @@ public class MainController implements Initializable {
     private void connectTelemetry() {
         SerialPortInfo selected = telemetryComboBox.getValue();
         if (selected == null) {
-            showAlert("Please select a port");
+            showAlert("Port Selection Required", "Please select a telemetry port");
             return;
         }
 
@@ -573,7 +746,7 @@ public class MainController implements Initializable {
             });
         } else {
             addSerialMessage(MessageType.ERROR, "Failed to connect to " + selected.port.getSystemPortName());
-            showAlert("Failed to open port: " + selected.port.getSystemPortName());
+            showAlert("Connection Failed", "Failed to open port: " + selected.port.getSystemPortName());
         }
     }
 
@@ -586,15 +759,20 @@ public class MainController implements Initializable {
             updateContentDisplay();
             setSerialMonitorEnabled(false);
             addSerialMessage(MessageType.INFO, "Telemetry disconnected");
+
+            if (satellite3DViewer != null) {
+                satellite3DViewer.reset();
+            }
         });
     }
 
-    // ============ VIDEO METHODS ============
+    // ===================================
+    // VIDEO METHODS
+    // ===================================
 
     private void refreshVideoSources() {
         List<VideoSource> sources = new ArrayList<>();
 
-        // Add camera options
         sources.add(new VideoSource("Camera 0 (Built-in)", 0, VideoCapture.VideoSourceType.USB_CAMERA));
         sources.add(new VideoSource("Camera 1 (USB)", 1, VideoCapture.VideoSourceType.USB_CAMERA));
         sources.add(new VideoSource("Camera 2 (USB)", 2, VideoCapture.VideoSourceType.USB_CAMERA));
@@ -620,52 +798,40 @@ public class MainController implements Initializable {
     private void connectVideo() {
         VideoSource selectedSource = videoComboBox.getValue();
         if (selectedSource == null) {
-            showAlert("Please select a video source");
+            showAlert("Video Source Required", "Please select a video source");
             return;
         }
 
-        // Disable controls while connecting
         uiStateManager.updateVideoConnectingUI(videoStatus, videoConnectBtn);
         videoComboBox.setDisable(true);
 
-        // Try to connect in a background thread
         new Thread(() -> {
             try {
-                // Attempt to start capture
                 videoCapture.startCapture(selectedSource, videoImageView);
 
-                // If successful, update UI
                 Platform.runLater(() -> {
                     uiStateManager.updateVideoConnectionUI(true, videoStatus, videoConnectBtn, videoExpandBtn);
-
-                    // Clear existing content and add video view
                     videoContainer.getChildren().clear();
                     videoContainer.getChildren().add(videoImageView);
-
                     updateContentDisplay();
                     addSerialMessage(MessageType.INFO, "Video connected: " + selectedSource.getName());
                 });
 
             } catch (Exception e) {
-                // Handle connection failure
                 Platform.runLater(() -> {
                     String errorMessage = e.getMessage();
-
-                    // Provide user-friendly error messages
                     if (errorMessage == null) {
                         errorMessage = "Unknown error";
                     } else if (errorMessage.contains("not available")) {
-                        showAlert("Camera " + selectedSource.getName() + " is not available.\n\n" +
-                                "Please try a different camera index.");
+                        showAlert("Camera Not Available", "Camera " + selectedSource.getName() + " is not available.\n\nPlease try a different camera index.");
                         errorMessage = "Camera not available";
                     } else if (errorMessage.contains("permission")) {
-                        showAlert("Camera access denied.\n\nPlease grant camera permissions in System Preferences.");
+                        showAlert("Camera Permission Denied", "Camera access denied.\n\nPlease grant camera permissions in System Preferences.");
                         errorMessage = "Permission denied";
                     } else {
-                        showAlert("Failed to connect:\n" + errorMessage);
+                        showAlert("Video Connection Failed", "Failed to connect:\n" + errorMessage);
                     }
 
-                    // Update UI state
                     uiStateManager.updateVideoConnectionError(errorMessage, videoStatus, videoConnectBtn);
                     videoComboBox.setDisable(false);
                     addSerialMessage(MessageType.ERROR, "Video connection failed: " + errorMessage);
@@ -681,7 +847,6 @@ public class MainController implements Initializable {
         uiStateManager.updateVideoConnectionUI(false, videoStatus, videoConnectBtn, videoExpandBtn);
         videoComboBox.setDisable(false);
 
-        // Clear video container
         videoContainer.getChildren().clear();
         Label placeholder = new Label("Video feed disconnected");
         placeholder.getStyleClass().add("info-label");
@@ -704,27 +869,21 @@ public class MainController implements Initializable {
             return;
         }
 
-        // Create external video ImageView
         externalVideoImageView = new ImageView();
         externalVideoImageView.setPreserveRatio(true);
 
-        // Create StackPane to hold the video
         StackPane videoPane = new StackPane(externalVideoImageView);
         videoPane.setStyle("-fx-background-color: black;");
 
-        // Create new stage
         videoStage = new Stage();
         videoStage.setTitle("NazarX Video Feed - External Display");
 
-        // Get screen information
         List<Screen> screens = Screen.getScreens();
 
-        // Create scene
         Scene scene = new Scene(videoPane, 1280, 720);
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/application.css")).toExternalForm());
         videoStage.setScene(scene);
 
-        // Position on second monitor if available
         if (screens.size() > 1) {
             Screen secondScreen = screens.get(1);
             Rectangle2D bounds = secondScreen.getVisualBounds();
@@ -739,21 +898,17 @@ public class MainController implements Initializable {
             videoStage.setY(0);
         }
 
-        // Bind video size to stage size
         externalVideoImageView.fitWidthProperty().bind(videoPane.widthProperty());
         externalVideoImageView.fitHeightProperty().bind(videoPane.heightProperty());
 
-        // Update video capture
         videoCapture.setExternalImageView(externalVideoImageView);
         videoCapture.setPrimaryImageView(null);
 
-        // Update main window
         videoContainer.getChildren().clear();
         Label externalModeLabel = new Label("Video is displayed in external window");
         externalModeLabel.getStyleClass().add("info-label");
         videoContainer.getChildren().add(externalModeLabel);
 
-        // Handle stage close
         videoStage.setOnCloseRequest(event -> {
             event.consume();
             closeExternalVideo();
@@ -782,21 +937,22 @@ public class MainController implements Initializable {
         }
     }
 
-    // ============ UTILITY METHODS ============
+    // ===================================
+    // UTILITY METHODS
+    // ===================================
 
     private void updateContentDisplay() {
         uiStateManager.updateContentPanels(telemetryPanel, telemetryPlaceholder,
                 videoPanel, videoPlaceholder, mapPanel, mapPlaceholder);
 
-        // Force map resize when showing
         if (uiStateManager.isTelemetryConnected()) {
             mapManager.forceResize();
         }
     }
 
-    private void showAlert(String message) {
+    private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
+        alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();

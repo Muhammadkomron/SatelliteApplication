@@ -4,6 +4,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Pane;
 
 public class UIStateManager {
 
@@ -81,10 +82,10 @@ public class UIStateManager {
         connectBtn.setDisable(false);
     }
 
-    public void updateContentPanels(VBox telemetryPanel, VBox telemetryPlaceholder,
+    public void updateContentPanels(Pane telemetryPanel, VBox telemetryPlaceholder,
                                     VBox videoPanel, VBox videoPlaceholder,
                                     VBox mapPanel, VBox mapPlaceholder) {
-        // Telemetry panel
+        // Telemetry panel (can be HBox or VBox)
         if (telemetryConnected) {
             telemetryPanel.setVisible(true);
             telemetryPanel.setManaged(true);
@@ -123,7 +124,8 @@ public class UIStateManager {
         }
     }
 
-    public void showAllPlaceholders(VBox telemetryPanel, VBox telemetryPlaceholder,
+    // Updated method to handle both HBox and VBox for telemetryPanel
+    public void showAllPlaceholders(Pane telemetryPanel, VBox telemetryPlaceholder,
                                     VBox videoPanel, VBox videoPlaceholder,
                                     VBox mapPanel, VBox mapPlaceholder) {
         telemetryPanel.setVisible(false);
