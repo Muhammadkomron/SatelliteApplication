@@ -1,5 +1,7 @@
 package com.example.satelliteapplication.manager;
 
+import com.example.satelliteapplication.service.SDCardLogReader;
+import com.example.satelliteapplication.util.XOREncryption;
 import com.fazecast.jSerialComm.SerialPort;
 import io.dronefleet.mavlink.MavlinkConnection;
 import io.dronefleet.mavlink.MavlinkMessage;
@@ -47,11 +49,17 @@ public class TelemetryManager {
     // ADD: Last known good data
     private final TelemetryData lastKnownGoodData = new TelemetryData();
 
+    // Add XOR encryption instance
+    private final XOREncryption xorEncryption = new XOREncryption();
+
+    // Flag to indicate if we're connected to LoRa
+    private boolean isLoRaConnection = false;
+
     // Callbacks
     private Consumer<String> logCallback;
     private Consumer<TelemetryData> dataUpdateCallback;
-    private Runnable disconnectCallback;
     private Consumer<Boolean> dataAvailabilityCallback; // NEW: callback for data availability status
+    private Runnable callback;
 
     // Helper class for telemetry data
     public static class TelemetryData {
@@ -68,6 +76,9 @@ public class TelemetryManager {
         public boolean hasGpsFix;
         public String flightMode = "Unknown";
         public boolean isArmed;
+        private SDCardLogReader sdCardLogReader;
+        private XOREncryption xorEncryption;
+        private boolean isLoRaMode = false;
 
         // Attitude
         public double roll;
@@ -123,6 +134,14 @@ public class TelemetryManager {
             this.isDataAvailable = other.isDataAvailable;
             this.isStale = other.isStale;
         }
+
+        public boolean isLoRaMode() {
+            return isLoRaMode;
+        }
+
+        public void setLoRaMode(boolean loRaMode) {
+            isLoRaMode = loRaMode;
+        }
     }
 
     public TelemetryManager() {
@@ -139,7 +158,7 @@ public class TelemetryManager {
     }
 
     public void setDisconnectCallback(Runnable callback) {
-        this.disconnectCallback = callback;
+        this.callback = callback;
     }
 
     private void checkDataAvailability() {
@@ -283,17 +302,112 @@ public class TelemetryManager {
         }
 
         try {
-            // Check if it's a MAVLink command (starts with MAV_)
-            if (command.toUpperCase().startsWith("MAV_")) {
+            // Check if this is a LoRa command or if we're connected to LoRa
+            if (isLoRaCommand(command) || isLoRaConnection) {
+                return sendLoRaCommand(command);
+            } else if (command.toUpperCase().startsWith("MAV_")) {
                 return sendMavlinkCommand(command);
             } else {
-                // Send as raw serial data
                 return sendRawCommand(command);
             }
         } catch (Exception e) {
             log("Error sending command: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Check if this is a LoRa command
+     */
+    private boolean isLoRaCommand(String command) {
+        String upperCmd = command.toUpperCase();
+        return upperCmd.startsWith("LORA:") ||
+                upperCmd.startsWith("LR900:") ||
+                upperCmd.contains("@LORA");
+    }
+
+    /**
+     * Send encrypted command via LoRa (LR900)
+     */
+    private boolean sendLoRaCommand(String command) {
+        try {
+            // Remove LoRa prefix if present
+            String actualCommand = command;
+            if (command.toUpperCase().startsWith("LORA:")) {
+                actualCommand = command.substring(5).trim();
+            } else if (command.toUpperCase().startsWith("LR900:")) {
+                actualCommand = command.substring(6).trim();
+            }
+
+            // Format and encrypt the message for LoRa transmission
+            String encryptedMessage = xorEncryption.formatLoRaMessage(actualCommand);
+
+            // Create MAVLink STATUSTEXT message to send encrypted data
+            // This will be received by SpeedyBee and logged to SD card
+            String mavlinkCommand = createStatusTextCommand(encryptedMessage);
+
+            // Send as raw serial data with proper formatting for LoRa
+            byte[] data = mavlinkCommand.getBytes(StandardCharsets.UTF_8);
+            outputStream.write(data);
+            outputStream.flush();
+
+            log("Sent encrypted LoRa command: " + actualCommand);
+            log("Encrypted payload: " + encryptedMessage);
+
+            // Also log to SD card write command if needed
+            sendSDCardWriteCommand(encryptedMessage);
+
+            return true;
+        } catch (IOException e) {
+            log("Failed to send LoRa command: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a MAVLink STATUSTEXT message for encrypted data
+     */
+    private String createStatusTextCommand(String encryptedMessage) {
+        // Format as AT command for LoRa module
+        return String.format("AT+SEND=%d,%s\r\n",
+                encryptedMessage.length(), encryptedMessage);
+    }
+
+    /**
+     * Send command to write encrypted message to SD card
+     */
+    private void sendSDCardWriteCommand(String encryptedMessage) {
+        try {
+            // Create SD card write command for SpeedyBee
+            // This ensures the encrypted message is logged to SD card
+            String sdCommand = String.format("SD_WRITE:%s\r\n", encryptedMessage);
+
+            byte[] data = sdCommand.getBytes(StandardCharsets.UTF_8);
+            outputStream.write(data);
+            outputStream.flush();
+
+            log("SD card write command sent");
+        } catch (IOException e) {
+            log("Failed to send SD write command: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Set whether this connection is to a LoRa module
+     */
+    public void setLoRaConnection(boolean isLoRa) {
+        this.isLoRaConnection = isLoRa;
+        if (isLoRa) {
+            log("LoRa mode enabled - messages will be encrypted");
+        }
+    }
+
+    /**
+     * Decrypt a message received from LoRa
+     */
+    public String decryptLoRaMessage(String encryptedMessage) {
+        XOREncryption.LoRaMessage loraMsg = xorEncryption.parseLoRaMessage(encryptedMessage);
+        return loraMsg.getDisplayString();
     }
 
     /**
@@ -470,9 +584,6 @@ public class TelemetryManager {
                                 }
 
                                 // Don't disconnect automatically - let user decide
-                                // if (disconnectCallback != null) {
-                                //     disconnectCallback.run();
-                                // }
                             });
                             // Don't break - keep trying to read
                             timeoutCount = 0; // Reset to keep trying
@@ -491,8 +602,7 @@ public class TelemetryManager {
 
     private void trackPacketSequence(MavlinkMessage<?> message) {
         // Increment total packet counter
-        long totalPackets = packetCounter.incrementAndGet();
-        telemetryData.totalPackets = totalPackets;
+        telemetryData.totalPackets = packetCounter.incrementAndGet();
 
         // Get sequence number from the message
         int sequence = message.getSequence();
@@ -598,7 +708,6 @@ public class TelemetryManager {
         handleStatusText(payload);
 
         // Log received message type (but not every message to avoid spam)
-        String msgType = payload.getClass().getSimpleName();
 
         // Notify callback
         if (dataUpdateCallback != null) {

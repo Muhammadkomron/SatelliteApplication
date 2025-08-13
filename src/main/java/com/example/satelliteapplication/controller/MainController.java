@@ -1,8 +1,11 @@
 package com.example.satelliteapplication.controller;
 
+import com.example.satelliteapplication.service.SDCardLogReader;
+import com.example.satelliteapplication.util.XOREncryption;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.Scene;
@@ -15,6 +18,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
@@ -35,14 +39,14 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.example.satelliteapplication.constants.ApplicationConstants.*;
 
 public class MainController implements Initializable {
 
@@ -50,24 +54,39 @@ public class MainController implements Initializable {
     // FXML INJECTIONS - ORGANIZED BY FUNCTION
     // ===================================
 
-    // Log File Controls
-    @FXML private Button openLogViewerBtn;
-    @FXML private Button downloadLogsBtn;
-
-    // Connection Controls
+    // Connection Controls - Telemetry
     @FXML private ComboBox<SerialPortInfo> telemetryComboBox;
-    @FXML private ComboBox<VideoSource> videoComboBox;
     @FXML private Button telemetryRefreshBtn;
     @FXML private Button telemetryConnectBtn;
+    @FXML private Label telemetryStatus;
+
+    // Connection Controls - Video
+    @FXML private ComboBox<VideoSource> videoComboBox;
     @FXML private Button videoRefreshBtn;
     @FXML private Button videoConnectBtn;
     @FXML private Button videoExpandBtn;
-    @FXML private Label telemetryStatus;
     @FXML private Label videoStatus;
 
-    // Telemetry Display
+    // Log Management Controls
+    @FXML private Button openLogViewerBtn;
+    @FXML private Button downloadLogsBtn;
+    @FXML private Button readSDCardBtn;
+    @FXML private Button exportDecryptedBtn;
+    @FXML private Label sdCardStatusLabel;
+
+    // LoRa Mode Controls
+    @FXML private CheckBox loRaModeCheckbox;
+
+    // Telemetry Display - Status Row
     @FXML private HBox telemetryPanel;
     @FXML private VBox telemetryPlaceholder;
+    @FXML private Label teamIdLabel;
+    @FXML private Label satelliteStatusLabel;
+    @FXML private HBox errorCodeContainer;
+    @FXML private Label packetCountLabel;
+    @FXML private Label missionTimeLabel;
+
+    // Telemetry Display - Main Data Grid
     @FXML private Label batteryVoltageLabel;
     @FXML private Label batteryStatusLabel;
     @FXML private Label gpsLatitudeLabel;
@@ -77,7 +96,6 @@ public class MainController implements Initializable {
     @FXML private Label armStatusLabel;
     @FXML private Label flightModeLabel;
     @FXML private Label satellitesLabel;
-    @FXML private Label missionTimeLabel;
     @FXML private Label pressureLabel;
     @FXML private Label verticalVelocityLabel;
     @FXML private Label distanceLabel;
@@ -87,13 +105,8 @@ public class MainController implements Initializable {
     @FXML private Label pitchLabel;
     @FXML private Label rollLabel;
     @FXML private Label yawLabel;
-    @FXML private Label teamIdLabel;
-    @FXML private Label satelliteStatusLabel;
-    @FXML private Label errorCodeLabel;
-    @FXML private Label packetCountLabel;
-    @FXML private HBox errorCodeContainer;
 
-    // 3D Orientation Controls
+    // 3D Orientation Visualization
     @FXML private StackPane satellite3DContainer;
     @FXML private Label orientation3DPlaceholder;
     @FXML private Label pitch3DLabel;
@@ -111,17 +124,14 @@ public class MainController implements Initializable {
     @FXML private VBox videoPanel;
     @FXML private VBox videoPlaceholder;
     @FXML private StackPane videoContainer;
-    private ImageView videoImageView;
-    private Stage videoStage;
-    private ImageView externalVideoImageView;
-    private boolean isExternalVideoMode = false;
-    private boolean isReceivingTelemetryData = false;
-    private Label dataStatusIndicator; // Optional: visual indicator for data status
 
     // Map Display
     @FXML private VBox mapPanel;
     @FXML private VBox mapPlaceholder;
     @FXML private WebView mapWebView;
+
+    // SD Card Log Table
+    @FXML private TableView<SDCardLogReader.LogEntry> sdLogTable;
 
     // ===================================
     // SERVICE MANAGERS
@@ -131,6 +141,16 @@ public class MainController implements Initializable {
     private UIStateManager uiStateManager;
     private VideoCapture videoCapture;
     private Satellite3DViewer satellite3DViewer;
+
+    // ===================================
+    // PRIVATE FIELDS AND STATE
+    // ===================================
+    private ImageView videoImageView;
+    private Stage videoStage;
+    private ImageView externalVideoImageView;
+    private boolean isExternalVideoMode = false;
+    private boolean isReceivingTelemetryData = false;
+    private Label dataStatusIndicator; // Optional: visual indicator for data status
 
     // ===================================
     // CONSTANTS AND CONFIGURATION
@@ -164,12 +184,18 @@ public class MainController implements Initializable {
      */
     private static final int ERROR_CODE_LENGTH = 4;
     private final int[] errorCodes = new int[ERROR_CODE_LENGTH];
-    
-    // Error code indices for better readability
-    private static final int GROUND_STATION_COMMUNICATION = 0;
-    private static final int PAYLOAD_POSITION_DATA = 1;
-    private static final int PAYLOAD_PRESSURE_DATA = 2;
-    private static final int RESERVED_ERROR_CODE = 3;
+
+    // Add new fields
+    private SDCardLogReader sdCardLogReader;
+    private XOREncryption xorEncryption;
+    private boolean isLoRaMode = false;
+
+    // Add UI components for SD card log viewing
+    // @FXML private TableView<SDCardLogReader.LogEntry> sdLogTable; // Moved to FXML
+    // @FXML private Button readSDCardBtn; // Moved to FXML
+    // @FXML private Button exportDecryptedBtn; // Moved to FXML
+    // @FXML private Label sdCardStatusLabel; // Moved to FXML
+    // @FXML private CheckBox loRaModeCheckbox; // Moved to FXML
 
     // ===================================
     // ENUMS AND HELPER CLASSES
@@ -197,20 +223,32 @@ public class MainController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        // Initialize service managers first
         initializeServiceManagers();
+        
+        // Initialize UI components
         initializeSatellite3DViewer();
+        initializeVideoImageView();
+        initializeMap();
+        
+        // Initialize telemetry and communication
         initializeTelemetryCallbacks();
         initializeSerialMonitor();
-        initializeVideoImageView();
-        setupEventHandlers();
         initializeComboBoxes();
-        initializeMap();
+        
+        // Initialize UI state and event handlers
+        setupEventHandlers();
         showInitialPlaceholders();
         initializeTelemetryFields();
         initializeStaticFields();
         initializeLogFileButtons();
         initializeErrorCodes();
+        initializeLoRaComponents();
     }
+
+    // ===================================
+    // SERVICE MANAGER INITIALIZATION
+    // ===================================
 
     private void initializeServiceManagers() {
         telemetryManager = new TelemetryManager();
@@ -219,13 +257,17 @@ public class MainController implements Initializable {
         videoCapture = new VideoCapture();
     }
 
-    private void initializeTelemetryCallbacks() {
-        telemetryManager.setLogCallback(this::handleTelemetryLog);
-        telemetryManager.setDataUpdateCallback(this::updateTelemetryDisplay);
-        telemetryManager.setDisconnectCallback(this::handleTelemetryDisconnect); // Modified
+    // ===================================
+    // UI COMPONENT INITIALIZATION
+    // ===================================
 
-        // ADD: Set data availability callback
-        telemetryManager.setDataAvailabilityCallback(this::handleDataAvailability);
+    private void initializeSatellite3DViewer() {
+        satellite3DViewer = new Satellite3DViewer(230, 200);
+
+        Platform.runLater(() -> {
+            satellite3DContainer.getChildren().clear();
+            satellite3DContainer.getChildren().add(satellite3DViewer.getSubScene());
+        });
     }
 
     private void initializeVideoImageView() {
@@ -235,12 +277,39 @@ public class MainController implements Initializable {
         videoImageView.fitHeightProperty().bind(videoContainer.heightProperty());
     }
 
-    private void setupEventHandlers() {
-        telemetryRefreshBtn.setOnAction(e -> refreshTelemetrySources());
-        telemetryConnectBtn.setOnAction(e -> toggleTelemetryConnection());
-        videoRefreshBtn.setOnAction(e -> refreshVideoSources());
-        videoConnectBtn.setOnAction(e -> toggleVideoConnection());
-        videoExpandBtn.setOnAction(e -> toggleExternalVideo());
+    private void initializeMap() {
+        mapManager.initialize(mapWebView);
+    }
+
+    // ===================================
+    // TELEMETRY AND COMMUNICATION INITIALIZATION
+    // ===================================
+
+    private void initializeTelemetryCallbacks() {
+        telemetryManager.setLogCallback(this::handleTelemetryLog);
+        telemetryManager.setDataUpdateCallback(this::updateTelemetryDisplay);
+        telemetryManager.setDisconnectCallback(this::handleTelemetryDisconnect);
+
+        // Set data availability callback
+        telemetryManager.setDataAvailabilityCallback(this::handleDataAvailability);
+    }
+
+    private void initializeSerialMonitor() {
+        serialSendButton.setOnAction(e -> sendSerialCommand());
+        serialClearButton.setOnAction(e -> clearSerialMonitor());
+
+        serialInputField.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ENTER) {
+                sendSerialCommand();
+            }
+        });
+
+        serialMessageContainer.heightProperty().addListener(
+                (obs, oldVal, newVal) -> Platform.runLater(() -> serialScrollPane.setVvalue(1.0))
+        );
+
+        setSerialMonitorEnabled(false);
+        addSerialMessage(MessageType.INFO, "Serial monitor ready. Connect telemetry to start.");
     }
 
     private void initializeComboBoxes() {
@@ -248,8 +317,16 @@ public class MainController implements Initializable {
         refreshVideoSources();
     }
 
-    private void initializeMap() {
-        mapManager.initialize(mapWebView);
+    // ===================================
+    // UI STATE AND EVENT HANDLER INITIALIZATION
+    // ===================================
+
+    private void setupEventHandlers() {
+        telemetryRefreshBtn.setOnAction(e -> refreshTelemetrySources());
+        telemetryConnectBtn.setOnAction(e -> toggleTelemetryConnection());
+        videoRefreshBtn.setOnAction(e -> refreshVideoSources());
+        videoConnectBtn.setOnAction(e -> toggleVideoConnection());
+        videoExpandBtn.setOnAction(e -> toggleExternalVideo());
     }
 
     private void showInitialPlaceholders() {
@@ -294,6 +371,521 @@ public class MainController implements Initializable {
         if (downloadLogsBtn != null) {
             downloadLogsBtn.setOnAction(e -> downloadLogsFromSD());
         }
+    }
+
+    private void initializeErrorCodes() {
+        // Initialize all error codes to 0 (green)
+        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
+            errorCodes[i] = 0;
+        }
+
+        // Create the error code container if it doesn't exist
+        if (errorCodeContainer == null) {
+            errorCodeContainer = new HBox(2); // 2px spacing between digits
+            errorCodeContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        }
+
+        updateErrorCodeDisplay();
+    }
+
+    private void initializeLoRaComponents() {
+        sdCardLogReader = new SDCardLogReader();
+        xorEncryption = new XOREncryption();
+
+        // Setup SD card log table if it exists in FXML
+        if (sdLogTable != null) {
+            setupSDLogTable();
+        }
+
+        // Setup LoRa mode checkbox
+        if (loRaModeCheckbox != null) {
+            loRaModeCheckbox.setOnAction(e -> {
+                isLoRaMode = loRaModeCheckbox.isSelected();
+                telemetryManager.setLoRaConnection(isLoRaMode);
+
+                if (isLoRaMode) {
+                    addSerialMessage(MessageType.INFO, "LoRa mode enabled - messages will be encrypted");
+                    serialInputField.setPromptText("Enter command (will be encrypted for LoRa)...");
+                } else {
+                    addSerialMessage(MessageType.INFO, "LoRa mode disabled - standard communication");
+                    serialInputField.setPromptText("Enter command...");
+                }
+            });
+        }
+
+        // Setup read SD card button
+        if (readSDCardBtn != null) {
+            readSDCardBtn.setOnAction(e -> readSDCardLogs());
+        }
+
+        // Setup export button
+        if (exportDecryptedBtn != null) {
+            exportDecryptedBtn.setOnAction(e -> exportDecryptedLogs());
+        }
+    }
+
+    /**
+     * Setup SD card log table
+     */
+    private void setupSDLogTable() {
+        // Create columns
+        TableColumn<SDCardLogReader.LogEntry, String> timeCol = new TableColumn<>("Time");
+        timeCol.setCellValueFactory(data -> {
+            String timeStr = new java.text.SimpleDateFormat("HH:mm:ss.SSS")
+                    .format(new Date(data.getValue().timestamp));
+            return new javafx.beans.property.SimpleStringProperty(timeStr);
+        });
+        timeCol.setPrefWidth(100);
+
+        TableColumn<SDCardLogReader.LogEntry, String> typeCol = new TableColumn<>("Type");
+        typeCol.setCellValueFactory(data ->
+                new javafx.beans.property.SimpleStringProperty(data.getValue().type));
+        typeCol.setPrefWidth(60);
+
+        TableColumn<SDCardLogReader.LogEntry, String> messageCol = new TableColumn<>("Message");
+        messageCol.setCellValueFactory(data ->
+                new javafx.beans.property.SimpleStringProperty(
+                        data.getValue().isEncrypted ?
+                                data.getValue().decryptedMessage :
+                                data.getValue().originalMessage
+                ));
+        messageCol.setPrefWidth(400);
+
+        TableColumn<SDCardLogReader.LogEntry, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(data ->
+                new javafx.beans.property.SimpleStringProperty(
+                        data.getValue().isEncrypted ? "DECRYPTED" : "PLAIN"
+                ));
+        statusCol.setPrefWidth(80);
+
+        // Style encrypted messages differently
+        statusCol.setCellFactory(column -> {
+            return new TableCell<SDCardLogReader.LogEntry, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (item == null || empty) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        if ("DECRYPTED".equals(item)) {
+                            setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+                        } else {
+                            setStyle("-fx-text-fill: #7f8c8d;");
+                        }
+                    }
+                }
+            };
+        });
+
+        sdLogTable.getColumns().addAll(timeCol, typeCol, messageCol, statusCol);
+        sdLogTable.setItems(sdCardLogReader.getObservableLogEntries());
+    }
+
+    /**
+     * Enhanced sendSerialCommand with LoRa encryption
+     */
+    private void sendSerialCommand() {
+        String command = serialInputField.getText().trim();
+        if (command.isEmpty()) {
+            return;
+        }
+
+        if (!telemetryManager.isConnected()) {
+            addSerialMessage(MessageType.ERROR, "Not connected to telemetry");
+            return;
+        }
+
+        // Check if LoRa mode is enabled or command specifies LoRa
+        if (isLoRaMode || command.toUpperCase().startsWith("LORA:")) {
+            // Show encrypted version in serial monitor
+            String encrypted = xorEncryption.encrypt(
+                    command.replace("LORA:", "").replace("lora:", "").trim()
+            );
+            addSerialMessage(MessageType.INFO, "Encrypting for LoRa: " + command);
+            addSerialMessage(MessageType.INFO, "Encrypted: " + encrypted);
+        }
+
+        boolean sent = telemetryManager.sendCommand(command);
+
+        if (sent) {
+            addSerialMessage(MessageType.SENT, command);
+            serialInputField.clear();
+
+            if (isLoRaMode) {
+                addSerialMessage(MessageType.INFO, "Message sent via LoRa (encrypted)");
+            }
+        } else {
+            addSerialMessage(MessageType.ERROR, "Failed to send: " + command);
+        }
+    }
+
+    /**
+     * Read logs from SD card
+     */
+    private void readSDCardLogs() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select SD Card Directory");
+
+        // Try to find mounted SD cards
+        File[] roots = File.listRoots();
+        for (File root : roots) {
+            if (root.canRead() && root.getTotalSpace() > 0) {
+                // Check if this might be an SD card
+                String name = root.getAbsolutePath();
+                if (name.contains("SD") || name.contains("SPEEDYBEE") ||
+                        name.contains("FLIGHT") || root.getTotalSpace() < 64L * 1024 * 1024 * 1024) {
+                    directoryChooser.setInitialDirectory(root);
+                    break;
+                }
+            }
+        }
+
+        File selectedDirectory = directoryChooser.showDialog(readSDCardBtn.getScene().getWindow());
+        if (selectedDirectory != null) {
+            loadSDCardLogs(selectedDirectory);
+        }
+    }
+
+    /**
+     * Load SD card logs with progress indication
+     */
+    private void loadSDCardLogs(File directory) {
+        if (sdCardStatusLabel != null) {
+            sdCardStatusLabel.setText("Reading SD card...");
+        }
+
+        Task<List<SDCardLogReader.LogEntry>> loadTask = new Task<>() {
+            @Override
+            protected List<SDCardLogReader.LogEntry> call() throws Exception {
+                return sdCardLogReader.readSDCardLogs(directory.getAbsolutePath());
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            List<SDCardLogReader.LogEntry> entries = loadTask.getValue();
+            Platform.runLater(() -> {
+                if (sdCardStatusLabel != null) {
+                    long encryptedCount = entries.stream()
+                            .filter(entry -> entry.isEncrypted)
+                            .count();
+
+                    sdCardStatusLabel.setText(String.format(
+                            "Loaded %d entries (%d encrypted LoRa messages decrypted)",
+                            entries.size(), encryptedCount
+                    ));
+                }
+
+                // Show decrypted messages in serial monitor
+                for (SDCardLogReader.LogEntry entry : entries) {
+                    if (entry.isEncrypted) {
+                        addSerialMessage(MessageType.RECEIVED,
+                                "DECRYPTED from SD: " + entry.decryptedMessage);
+                    }
+                }
+
+                // Show success message
+                showAlert("SD Card Logs Loaded",
+                        String.format("Successfully loaded %d log entries\n" +
+                                        "%d encrypted LoRa messages were decrypted",
+                                entries.size(),
+                                entries.stream().filter(e1 -> e1.isEncrypted).count()),
+                        Alert.AlertType.INFORMATION);
+            });
+        });
+
+        loadTask.setOnFailed(e -> {
+            Platform.runLater(() -> {
+                if (sdCardStatusLabel != null) {
+                    sdCardStatusLabel.setText("Failed to read SD card");
+                }
+                Throwable error = loadTask.getException();
+                showAlert("SD Card Read Error",
+                        "Failed to read logs: " + error.getMessage(),
+                        Alert.AlertType.ERROR);
+            });
+        });
+
+        new Thread(loadTask).start();
+    }
+
+    /**
+     * Export decrypted logs to file
+     */
+    private void exportDecryptedLogs() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Decrypted Logs");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Text Files", "*.txt"),
+                new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                .format(new Date());
+        fileChooser.setInitialFileName("decrypted_logs_" + timestamp + ".txt");
+
+        File file = fileChooser.showSaveDialog(exportDecryptedBtn.getScene().getWindow());
+        if (file != null) {
+            try {
+                sdCardLogReader.exportDecryptedMessages(file);
+                showAlert("Export Successful",
+                        "Decrypted logs exported to:\n" + file.getAbsolutePath(),
+                        Alert.AlertType.INFORMATION);
+            } catch (IOException ex) {
+                showAlert("Export Failed",
+                        "Failed to export logs: " + ex.getMessage(),
+                        Alert.AlertType.ERROR);
+            }
+        }
+    }
+
+    /**
+     * Process received telemetry data for encrypted messages
+     */
+    private void handleTelemetryLog(String message) {
+        MessageType type = MessageType.RECEIVED;
+
+        // Check if this is an encrypted LoRa message from telemetry
+        if (message.contains(XOREncryption.LORA_MSG_PREFIX)) {
+            // Decrypt the message
+            String decrypted = telemetryManager.decryptLoRaMessage(message);
+            addSerialMessage(MessageType.RECEIVED, "Encrypted LoRa: " + message);
+            addSerialMessage(MessageType.INFO, "Decrypted: " + decrypted);
+            return;
+        }
+
+        // ... existing handleTelemetryLog code ...
+        if (message.startsWith("Sent:") || message.startsWith("Sending")) {
+            type = MessageType.SENT;
+        } else if (message.contains("Error") || message.contains("Failed")) {
+            type = MessageType.ERROR;
+        } else if (message.contains("Connected") || message.contains("Disconnected") ||
+                message.contains("Waiting") || message.contains("Requesting")) {
+            type = MessageType.INFO;
+        }
+
+        addSerialMessage(type, message);
+    }
+
+    /**
+     * Enhanced showAlert method with AlertType parameter
+     */
+    private void showAlert(String title, String message, Alert.AlertType type) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    /**
+     * Test encryption/decryption functionality
+     */
+    public void testEncryption() {
+        String testMessage = "TEST: Satellite telemetry data @" + System.currentTimeMillis();
+
+        addSerialMessage(MessageType.INFO, "=== ENCRYPTION TEST ===");
+        addSerialMessage(MessageType.INFO, "Original: " + testMessage);
+
+        String encrypted = xorEncryption.encrypt(testMessage);
+        addSerialMessage(MessageType.INFO, "Encrypted: " + encrypted);
+
+        String decrypted = xorEncryption.decrypt(encrypted);
+        addSerialMessage(MessageType.INFO, "Decrypted: " + decrypted);
+
+        boolean valid = testMessage.equals(decrypted);
+        addSerialMessage(valid ? MessageType.INFO : MessageType.ERROR,
+                "Validation: " + (valid ? "PASSED" : "FAILED"));
+        addSerialMessage(MessageType.INFO, "===================");
+    }
+
+    /**
+     * Check if connected port is LoRa
+     */
+    private void checkLoRaConnection() {
+        SerialPortInfo selected = telemetryComboBox.getValue();
+        if (selected != null) {
+            String portName = selected.port.getDescriptivePortName().toLowerCase();
+
+            // Auto-detect LoRa based on port name
+            if (portName.contains("lora") || portName.contains("lr900") ||
+                    portName.contains("radio") || portName.contains("433") ||
+                    portName.contains("915") || portName.contains("868")) {
+
+                isLoRaMode = true;
+                telemetryManager.setLoRaConnection(true);
+
+                if (loRaModeCheckbox != null) {
+                    loRaModeCheckbox.setSelected(true);
+                }
+
+                addSerialMessage(MessageType.INFO,
+                        "LoRa module detected - encryption enabled automatically");
+            }
+        }
+    }
+
+    /**
+     * Helper method to create quick LoRa commands
+     */
+    private void setupLoRaQuickCommands() {
+        // Add context menu to serial input field for quick LoRa commands
+        ContextMenu contextMenu = new ContextMenu();
+
+        MenuItem encryptTest = new MenuItem("Test Encryption");
+        encryptTest.setOnAction(e -> testEncryption());
+
+        MenuItem sendStatus = new MenuItem("Send Status Request (LoRa)");
+        sendStatus.setOnAction(e -> {
+            serialInputField.setText("LORA:STATUS_REQUEST");
+            sendSerialCommand();
+        });
+
+        MenuItem sendGPS = new MenuItem("Request GPS (LoRa)");
+        sendGPS.setOnAction(e -> {
+            serialInputField.setText("LORA:GPS_REQUEST");
+            sendSerialCommand();
+        });
+
+        MenuItem sendArm = new MenuItem("Send ARM Command (LoRa)");
+        sendArm.setOnAction(e -> {
+            serialInputField.setText("LORA:MAV_ARM");
+            sendSerialCommand();
+        });
+
+        contextMenu.getItems().addAll(encryptTest, sendStatus, sendGPS, sendArm);
+        serialInputField.setContextMenu(contextMenu);
+    }
+
+    // ===================================
+    // UTILITY METHODS
+    // ===================================
+
+    private void handleDataAvailability(boolean isAvailable) {
+        isReceivingTelemetryData = isAvailable;
+
+        Platform.runLater(() -> {
+            if (isAvailable) {
+                // Data is flowing
+                addSerialMessage(MessageType.INFO, "Telemetry data stream active");
+
+                // Update error codes to show communication is good
+                setGroundStationCommunicationStatus(true);
+
+                // Optional: Update visual indicator
+                if (telemetryStatus != null) {
+                    telemetryStatus.setText("● Connected (Live)");
+                    telemetryStatus.getStyleClass().clear();
+                    telemetryStatus.getStyleClass().add("status-connected");
+                }
+            } else {
+                // Data not flowing but connection still active
+                addSerialMessage(MessageType.WARNING, "No telemetry data - displaying last known values");
+
+                // Update error codes to show communication issue
+                setGroundStationCommunicationStatus(false);
+
+                // Optional: Update visual indicator
+                if (telemetryStatus != null) {
+                    telemetryStatus.setText("● Connected (No Data)");
+                    telemetryStatus.getStyleClass().clear();
+                    telemetryStatus.getStyleClass().add("status-connecting"); // Orange color
+                }
+            }
+        });
+    }
+
+    private void handleTelemetryDisconnect() {
+        // This is called when telemetry has issues
+        // Don't auto-disconnect, just notify user
+        Platform.runLater(() -> {
+            addSerialMessage(MessageType.WARNING, "Telemetry connection issue detected");
+            // Don't call disconnectTelemetry() automatically
+        });
+    }
+
+    private void updateContentDisplay() {
+        // Modified to always show telemetry panel if connected, regardless of data availability
+        boolean showTelemetry = uiStateManager.isTelemetryConnected();
+
+        if (showTelemetry) {
+            telemetryPanel.setVisible(true);
+            telemetryPanel.setManaged(true);
+            telemetryPlaceholder.setVisible(false);
+            telemetryPlaceholder.setManaged(false);
+
+            // Also show map when telemetry is connected
+            mapPanel.setVisible(true);
+            mapPanel.setManaged(true);
+            mapPlaceholder.setVisible(false);
+            mapPlaceholder.setManaged(false);
+
+            if (uiStateManager.isTelemetryConnected()) {
+                mapManager.forceResize();
+            }
+        } else {
+            telemetryPanel.setVisible(false);
+            telemetryPanel.setManaged(false);
+            telemetryPlaceholder.setVisible(true);
+            telemetryPlaceholder.setManaged(true);
+
+            // Hide map when telemetry is disconnected
+            mapPanel.setVisible(false);
+            mapPanel.setManaged(false);
+            mapPlaceholder.setVisible(true);
+            mapPlaceholder.setManaged(true);
+        }
+
+        // Video panel management remains the same
+        if (uiStateManager.isVideoConnected()) {
+            videoPanel.setVisible(true);
+            videoPanel.setManaged(true);
+            videoPlaceholder.setVisible(false);
+            videoPlaceholder.setManaged(false);
+        } else {
+            videoPanel.setVisible(false);
+            videoPanel.setManaged(false);
+            videoPlaceholder.setVisible(true);
+            videoPlaceholder.setManaged(true);
+        }
+    }
+
+    private enum MessageType {
+        RECEIVED("RX", "serial-message-rx"),
+        SENT("TX", "serial-message-tx"),
+        ERROR("ERR", "serial-message-error"),
+        INFO("INFO", "serial-message-info"),
+        WARNING("WARN", "serial-message-warning"); // ADD THIS
+
+        private final String prefix;
+        private final String styleClass;
+
+        MessageType(String prefix, String styleClass) {
+            this.prefix = prefix;
+            this.styleClass = styleClass;
+        }
+    }
+
+    private void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    public void shutdown() {
+        if (telemetryManager != null) {
+            telemetryManager.shutdown();
+        }
+
+        if (videoCapture != null) {
+            videoCapture.stopCapture();
+        }
+
+        closeExternalVideo();
     }
 
     // ===================================
@@ -345,24 +937,6 @@ public class MainController implements Initializable {
     }
 
     /**
-     * Initialize error codes - Updated version
-     */
-    private void initializeErrorCodes() {
-        // Initialize all error codes to 0 (green)
-        for (int i = 0; i < ERROR_CODE_LENGTH; i++) {
-            errorCodes[i] = 0;
-        }
-
-        // Create the error code container if it doesn't exist
-        if (errorCodeContainer == null) {
-            errorCodeContainer = new HBox(2); // 2px spacing between digits
-            errorCodeContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        }
-
-        updateErrorCodeDisplay();
-    }
-
-    /**
      * Sets the payload position data error code - FIXED to always show green
      * @param hasPositionData true if position data is obtained, false otherwise
      */
@@ -371,6 +945,7 @@ public class MainController implements Initializable {
         errorCodes[PAYLOAD_POSITION_DATA] = 0; // Always green
         updateErrorCodeDisplay();
     }
+
     /**
      * Sets the ground station communication error code
      * @param hasCommunication true if communication is established, false otherwise
@@ -416,15 +991,6 @@ public class MainController implements Initializable {
     // ===================================
     // 3D VISUALIZATION METHODS
     // ===================================
-
-    private void initializeSatellite3DViewer() {
-        satellite3DViewer = new Satellite3DViewer(230, 200);
-
-        Platform.runLater(() -> {
-            satellite3DContainer.getChildren().clear();
-            satellite3DContainer.getChildren().add(satellite3DViewer.getSubScene());
-        });
-    }
 
     private void updateSatellite3DOrientation(double pitch, double roll, double yaw) {
         if (satellite3DViewer != null) {
@@ -519,45 +1085,6 @@ public class MainController implements Initializable {
     // SERIAL MONITOR METHODS
     // ===================================
 
-    private void initializeSerialMonitor() {
-        serialSendButton.setOnAction(e -> sendSerialCommand());
-        serialClearButton.setOnAction(e -> clearSerialMonitor());
-
-        serialInputField.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.ENTER) {
-                sendSerialCommand();
-            }
-        });
-
-        serialMessageContainer.heightProperty().addListener(
-                (obs, oldVal, newVal) -> Platform.runLater(() -> serialScrollPane.setVvalue(1.0))
-        );
-
-        setSerialMonitorEnabled(false);
-        addSerialMessage(MessageType.INFO, "Serial monitor ready. Connect telemetry to start.");
-    }
-
-    private void sendSerialCommand() {
-        String command = serialInputField.getText().trim();
-        if (command.isEmpty()) {
-            return;
-        }
-
-        if (!telemetryManager.isConnected()) {
-            addSerialMessage(MessageType.ERROR, "Not connected to telemetry");
-            return;
-        }
-
-        boolean sent = telemetryManager.sendCommand(command);
-
-        if (sent) {
-            addSerialMessage(MessageType.SENT, command);
-            serialInputField.clear();
-        } else {
-            addSerialMessage(MessageType.ERROR, "Failed to send: " + command);
-        }
-    }
-
     private void clearSerialMonitor() {
         Platform.runLater(() -> {
             serialMessageContainer.getChildren().clear();
@@ -587,21 +1114,6 @@ public class MainController implements Initializable {
 
             serialScrollPane.setVvalue(1.0);
         });
-    }
-
-    private void handleTelemetryLog(String message) {
-        MessageType type = MessageType.RECEIVED;
-
-        if (message.startsWith("Sent:") || message.startsWith("Sending")) {
-            type = MessageType.SENT;
-        } else if (message.contains("Error") || message.contains("Failed")) {
-            type = MessageType.ERROR;
-        } else if (message.contains("Connected") || message.contains("Disconnected") ||
-                message.contains("Waiting") || message.contains("Requesting")) {
-            type = MessageType.INFO;
-        }
-
-        addSerialMessage(type, message);
     }
 
     private void setSerialMonitorEnabled(boolean enabled) {
@@ -999,134 +1511,5 @@ public class MainController implements Initializable {
             videoExpandBtn.setText("Expand Video");
             isExternalVideoMode = false;
         }
-    }
-
-    // ===================================
-    // UTILITY METHODS
-    // ===================================
-
-    private void handleDataAvailability(boolean isAvailable) {
-        isReceivingTelemetryData = isAvailable;
-
-        Platform.runLater(() -> {
-            if (isAvailable) {
-                // Data is flowing
-                addSerialMessage(MessageType.INFO, "Telemetry data stream active");
-
-                // Update error codes to show communication is good
-                setGroundStationCommunicationStatus(true);
-
-                // Optional: Update visual indicator
-                if (telemetryStatus != null) {
-                    telemetryStatus.setText("● Connected (Live)");
-                    telemetryStatus.getStyleClass().clear();
-                    telemetryStatus.getStyleClass().add("status-connected");
-                }
-            } else {
-                // Data not flowing but connection still active
-                addSerialMessage(MessageType.WARNING, "No telemetry data - displaying last known values");
-
-                // Update error codes to show communication issue
-                setGroundStationCommunicationStatus(false);
-
-                // Optional: Update visual indicator
-                if (telemetryStatus != null) {
-                    telemetryStatus.setText("● Connected (No Data)");
-                    telemetryStatus.getStyleClass().clear();
-                    telemetryStatus.getStyleClass().add("status-connecting"); // Orange color
-                }
-            }
-        });
-    }
-
-    private void handleTelemetryDisconnect() {
-        // This is called when telemetry has issues
-        // Don't auto-disconnect, just notify user
-        Platform.runLater(() -> {
-            addSerialMessage(MessageType.WARNING, "Telemetry connection issue detected");
-            // Don't call disconnectTelemetry() automatically
-        });
-    }
-
-    private void updateContentDisplay() {
-        // Modified to always show telemetry panel if connected, regardless of data availability
-        boolean showTelemetry = uiStateManager.isTelemetryConnected();
-
-        if (showTelemetry) {
-            telemetryPanel.setVisible(true);
-            telemetryPanel.setManaged(true);
-            telemetryPlaceholder.setVisible(false);
-            telemetryPlaceholder.setManaged(false);
-
-            // Also show map when telemetry is connected
-            mapPanel.setVisible(true);
-            mapPanel.setManaged(true);
-            mapPlaceholder.setVisible(false);
-            mapPlaceholder.setManaged(false);
-
-            if (uiStateManager.isTelemetryConnected()) {
-                mapManager.forceResize();
-            }
-        } else {
-            telemetryPanel.setVisible(false);
-            telemetryPanel.setManaged(false);
-            telemetryPlaceholder.setVisible(true);
-            telemetryPlaceholder.setManaged(true);
-
-            // Hide map when telemetry is disconnected
-            mapPanel.setVisible(false);
-            mapPanel.setManaged(false);
-            mapPlaceholder.setVisible(true);
-            mapPlaceholder.setManaged(true);
-        }
-
-        // Video panel management remains the same
-        if (uiStateManager.isVideoConnected()) {
-            videoPanel.setVisible(true);
-            videoPanel.setManaged(true);
-            videoPlaceholder.setVisible(false);
-            videoPlaceholder.setManaged(false);
-        } else {
-            videoPanel.setVisible(false);
-            videoPanel.setManaged(false);
-            videoPlaceholder.setVisible(true);
-            videoPlaceholder.setManaged(true);
-        }
-    }
-
-    private enum MessageType {
-        RECEIVED("RX", "serial-message-rx"),
-        SENT("TX", "serial-message-tx"),
-        ERROR("ERR", "serial-message-error"),
-        INFO("INFO", "serial-message-info"),
-        WARNING("WARN", "serial-message-warning"); // ADD THIS
-
-        private final String prefix;
-        private final String styleClass;
-
-        MessageType(String prefix, String styleClass) {
-            this.prefix = prefix;
-            this.styleClass = styleClass;
-        }
-    }
-
-    private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
-    }
-
-    public void shutdown() {
-        if (telemetryManager != null) {
-            telemetryManager.shutdown();
-        }
-
-        if (videoCapture != null) {
-            videoCapture.stopCapture();
-        }
-
-        closeExternalVideo();
     }
 }

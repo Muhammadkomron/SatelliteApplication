@@ -375,48 +375,115 @@ HBox, VBox, StackPane, GridPane {
 
 /* Telemetry grid */
 .telemetry-grid {
-    -fx-padding: 12;
-    -fx-background-color: #f8f9fa;
-    -fx-background-radius: 8;
-    -fx-border-color: -fx-border-light;
-    -fx-border-width: 1;
-    -fx-border-radius: 8;
-    -fx-min-height: -1;
-    -fx-pref-height: -1;
+    -fx-padding: 2 8 2 8;
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-width: 0;
 }
 
-.telemetry-panel GridPane {
-    -fx-hgap: 30;
-    -fx-vgap: 12;
+/* Telemetry panel background */
+#telemetryPanel {
+    -fx-background-color: transparent;
 }
 
+/* Smaller telemetry labels - improved contrast */
 .telemetry-label {
-    -fx-text-fill: -fx-text-secondary;
-    -fx-font-size: 12px;
+    -fx-text-fill: #5a6c7d;
+    -fx-font-size: 11px;
     -fx-font-weight: 600;
-    -fx-min-width: 120;
-    -fx-pref-width: 130;
-    -fx-opacity: 0.85;
+    -fx-min-width: 85;
+    -fx-pref-width: 90;
+    -fx-padding: 0;
 }
 
+/* Smaller telemetry values - better visibility */
 .telemetry-value {
     -fx-font-family: "SF Mono", "Consolas", "Monaco", monospace;
-    -fx-text-fill: -fx-primary;
-    -fx-font-size: 13px;
+    -fx-text-fill: #2c3e50;
+    -fx-font-size: 12px;
     -fx-font-weight: 700;
-    -fx-min-width: 90;
+    -fx-min-width: 70;
     -fx-background-color: transparent;
-    -fx-padding: 3 6;
-    -fx-background-radius: 4;
+    -fx-padding: 0 4;
+    -fx-background-radius: 3;
 }
 
-/* Special telemetry values with color coding */
+/* Special styling for specific values */
+#batteryVoltageLabel,
+#batteryStatusLabel {
+    -fx-text-fill: #27ae60;
+}
+
+#gpsLatitudeLabel,
+#gpsLongitudeLabel {
+    -fx-text-fill: #3498db;
+}
+
+#altitudeLabel,
+#speedLabel {
+    -fx-text-fill: #8e44ad;
+}
+
+#pitchLabel,
+#rollLabel,
+#yawLabel {
+    -fx-text-fill: #16a085;
+}
+
+/* Reduce spacing in telemetry panel */
+#telemetryPanel GridPane {
+    -fx-hgap: 20;
+    -fx-vgap: 2;
+}
+
+/* Compact status row labels */
 #teamIdLabel,
 #satelliteStatusLabel,
-#missionTimeLabel {
-    -fx-font-size: 13px;
+#missionTimeLabel,
+#packetCountLabel {
+    -fx-font-size: 12px;
     -fx-font-weight: 700;
-    -fx-text-fill: #8b44ad;
+    -fx-text-fill: #2c3e50;
+    -fx-padding: 0 2;
+}
+
+/* 3D Satellite viewer container styling - cleaner look */
+.orientation-3d-container {
+    -fx-background-color: rgba(248, 249, 250, 0.5);
+    -fx-background-radius: 8;
+    -fx-border-color: #e1e8ed;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+}
+
+.satellite-3d-view {
+    -fx-background-color: #f8f9fa;
+    -fx-background-radius: 6;
+    -fx-border-color: #e1e8ed;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+}
+
+/* Compact orientation labels for 3D view */
+.orientation-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #5a6c7d;
+    -fx-font-weight: 600;
+}
+
+.orientation-value {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #16a085;
+    -fx-font-family: "SF Mono", "Consolas", monospace;
+}
+
+/* Remove section header since we removed the label */
+.section-header {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2c3e50;
+    -fx-font-weight: bold;
+    -fx-padding: 0 0 4 0;
 }
 
 /* ===================================

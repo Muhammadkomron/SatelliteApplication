@@ -2,11 +2,17 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.ColumnConstraints?>
@@ -21,13 +27,13 @@
 
 <VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="800.0" prefWidth="1400.0" spacing="8.0" stylesheets="@../../css/application.css" xmlns="http://javafx.com/javafx/24.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.satelliteapplication.controller.MainController">
    <children>
-      <!-- Connection Panel - More Compact -->
+      <!-- Connection Panel - Enhanced with LoRa Support -->
       <StackPane>
          <children>
             <VBox spacing="3.0" styleClass="connection-box">
                <children>
 
-                  <!-- Telemetry Connection -->
+                  <!-- Telemetry Connection with LoRa Mode -->
                   <VBox spacing="6.0">
                      <children>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
@@ -38,20 +44,21 @@
                               <Button fx:id="telemetryConnectBtn" mnemonicParsing="false" prefWidth="120.0" styleClass="connect-button" text="Connect">
                                  <font>
                                     <Font size="12.0" />
-                                 </font></Button>
-                              <Label fx:id="telemetryStatus" styleClass="status-disconnected" text="● Disconnected" />
-                              <Button fx:id="openLogViewerBtn" mnemonicParsing="false" prefWidth="140.0" styleClass="expand-button" text="Open Log Viewer">
-                                 <font>
-                                    <Font size="12.0" />
                                  </font>
                               </Button>
-                              <Button fx:id="downloadLogsBtn" mnemonicParsing="false" prefHeight="34.0" prefWidth="140.0" styleClass="button" text="Download Logs">
-                                 <font>
-                                    <Font size="12.0" />
-                                 </font>
-                                 <HBox.margin>
-                                    <Insets />
-                                 </HBox.margin>
+                              <Label fx:id="telemetryStatus" styleClass="status-disconnected" text="● Disconnected" />
+
+                              <!-- LoRa Mode Controls -->
+                              <Separator orientation="VERTICAL" />
+                              <CheckBox fx:id="loRaModeCheckbox" text="LoRa Mode (XOR)" styleClass="info-label">
+                                 <tooltip>
+                                    <Tooltip text="Enable XOR encryption for LoRa communication" />
+                                 </tooltip>
+                              </CheckBox>
+                              <Button fx:id="testEncryptionBtn" text="Test" onAction="#testEncryption" styleClass="button" prefWidth="60.0">
+                                 <tooltip>
+                                    <Tooltip text="Test XOR encryption/decryption" />
+                                 </tooltip>
                               </Button>
                            </children>
                            <VBox.margin>
@@ -75,8 +82,10 @@
                               <Button fx:id="videoConnectBtn" mnemonicParsing="false" prefWidth="120.0" styleClass="connect-button" text="Connect">
                                  <font>
                                     <Font size="12.0" />
-                                 </font></Button>
+                                 </font>
+                              </Button>
                               <Label fx:id="videoStatus" styleClass="status-disconnected" text="● Disconnected" />
+                              <Button fx:id="videoExpandBtn" styleClass="expand-button" text="Expand" visible="false" managed="false" />
                            </children>
                            <VBox.margin>
                               <Insets left="5.0" />
@@ -85,12 +94,40 @@
                      </children>
                   </VBox>
 
-                  <!-- Log Viewer Section -->
+                  <!-- Separator -->
+                  <Separator styleClass="separator" />
+
+                  <!-- Log Management Section - Reorganized to be more compact -->
                   <VBox spacing="6.0">
                      <children>
                         <HBox alignment="CENTER_LEFT" spacing="10.0">
                            <children>
-                              <Region HBox.hgrow="ALWAYS" />
+                              <Label styleClass="connection-label" text="Logs" />
+                              <Button fx:id="openLogViewerBtn" mnemonicParsing="false" prefWidth="140.0" styleClass="expand-button" text="Open Log Viewer">
+                                 <font>
+                                    <Font size="12.0" />
+                                 </font>
+                              </Button>
+                              <Button fx:id="downloadLogsBtn" mnemonicParsing="false" prefHeight="34.0" prefWidth="140.0" styleClass="button" text="Download Logs">
+                                 <font>
+                                    <Font size="12.0" />
+                                 </font>
+                              </Button>
+
+                              <!-- SD Card Controls -->
+                              <Separator orientation="VERTICAL" />
+                              <Label styleClass="connection-label" text="SD Card:" />
+                              <Button fx:id="readSDCardBtn" text="Read SD Card" styleClass="button" prefWidth="120.0">
+                                 <tooltip>
+                                    <Tooltip text="Read and decrypt logs from SpeedyBee SD card" />
+                                 </tooltip>
+                              </Button>
+                              <Button fx:id="exportDecryptedBtn" text="Export Decrypted" styleClass="expand-button" prefWidth="140.0">
+                                 <tooltip>
+                                    <Tooltip text="Export decrypted LoRa messages to file" />
+                                 </tooltip>
+                              </Button>
+                              <Label fx:id="sdCardStatusLabel" styleClass="info-label" text="No SD card loaded" />
                            </children>
                            <VBox.margin>
                               <Insets left="5.0" />
@@ -106,311 +143,381 @@
          </padding>
       </StackPane>
 
-      <!-- Main Content Area - More Compact Layout -->
-      <VBox spacing="8.0" VBox.vgrow="ALWAYS">
-         <VBox.margin>
-            <Insets bottom="8.0" left="10.0" right="10.0" />
-         </VBox.margin>
-         <children>
-            <!-- TOP SECTION - Telemetry Data with 3D Visualization - More Compact -->
-            <StackPane maxHeight="260.0" minHeight="260.0" prefHeight="260.0" styleClass="content-area">
-               <children>
-                  <!-- Telemetry Panel (shown when connected) -->
-                  <HBox fx:id="telemetryPanel" maxHeight="260.0" spacing="10.0" visible="false">
-                     <padding>
-                        <Insets bottom="10.0" left="12.0" right="12.0" top="10.0" />
-                     </padding>
+      <!-- Main Content Area with Tabs -->
+      <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+         <tabs>
+            <!-- Main Operations Tab -->
+            <Tab text="Main Operations">
+               <content>
+                  <VBox spacing="8.0">
+                     <VBox.margin>
+                        <Insets bottom="8.0" left="10.0" right="10.0" />
+                     </VBox.margin>
                      <children>
-                        <!-- Left side - Telemetry Data -->
-                        <VBox alignment="TOP_LEFT" maxHeight="240.0" spacing="6.0" HBox.hgrow="ALWAYS">
+                        <!-- TOP SECTION - Telemetry Data with 3D Visualization -->
+                        <StackPane maxHeight="260.0" minHeight="260.0" prefHeight="260.0" styleClass="content-area">
                            <children>
-
-                              <!-- Static Status Row - More Compact -->
-                              <GridPane hgap="18.0" prefHeight="16.0">
+                              <!-- Telemetry Panel (shown when connected) -->
+                              <HBox fx:id="telemetryPanel" maxHeight="260.0" spacing="10.0" visible="false">
+                                 <padding>
+                                    <Insets bottom="10.0" left="12.0" right="12.0" top="10.0" />
+                                 </padding>
                                  <children>
-                                    <Label styleClass="telemetry-label" text="Team ID:" GridPane.columnIndex="0" />
-                                    <Label fx:id="teamIdLabel" styleClass="telemetry-value" text="569287" GridPane.columnIndex="1" />
+                                    <!-- Left side - Telemetry Data -->
+                                    <VBox alignment="TOP_LEFT" maxHeight="240.0" spacing="5.0" HBox.hgrow="ALWAYS">
+                                       <children>
+                                          <!-- Static Status Row -->
+                                          <GridPane hgap="18.0" prefHeight="16.0">
+                                             <children>
+                                                <Label styleClass="telemetry-label" text="Team ID:" GridPane.columnIndex="0" />
+                                                <Label fx:id="teamIdLabel" styleClass="telemetry-value" text="569287" GridPane.columnIndex="1" />
 
-                                    <Label styleClass="telemetry-label" text="Satellite Status:" GridPane.columnIndex="2" />
-                                    <Label fx:id="satelliteStatusLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="3" />
+                                                <Label styleClass="telemetry-label" text="Satellite Status:" GridPane.columnIndex="2" />
+                                                <Label fx:id="satelliteStatusLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="3" />
 
-                                    <Label styleClass="telemetry-label" text="Error Code:" GridPane.columnIndex="4" />
-                                    <HBox fx:id="errorCodeContainer" alignment="CENTER_LEFT" spacing="2" GridPane.columnIndex="5">
-                                       <!-- Error code digits will be added programmatically -->
+                                                <Label styleClass="telemetry-label" text="Error Code:" GridPane.columnIndex="4" />
+                                                <HBox fx:id="errorCodeContainer" alignment="CENTER_LEFT" spacing="2" GridPane.columnIndex="5" />
+
+                                                <Label styleClass="telemetry-label" text="Packet Count:" GridPane.columnIndex="6" />
+                                                <Label fx:id="packetCountLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="7" />
+
+                                                <Label styleClass="telemetry-label" text="Mission Time:" GridPane.columnIndex="8" />
+                                                <Label fx:id="missionTimeLabel" styleClass="telemetry-value" text="01/01/2025 00:00:00" GridPane.columnIndex="9" />
+                                             </children>
+                                             <columnConstraints>
+                                                <ColumnConstraints maxWidth="55.0" minWidth="50.0" prefWidth="52.0" />
+                                                <ColumnConstraints maxWidth="60.0" minWidth="55.0" prefWidth="58.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                                <ColumnConstraints minWidth="35.0" prefWidth="40.0" />
+                                                <ColumnConstraints minWidth="60.0" prefWidth="65.0" />
+                                                <ColumnConstraints minWidth="85.0" prefWidth="90.0" />
+                                                <ColumnConstraints minWidth="70.0" prefWidth="75.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                                <ColumnConstraints minWidth="120.0" prefWidth="125.0" />
+                                             </columnConstraints>
+                                             <rowConstraints>
+                                                <RowConstraints />
+                                             </rowConstraints>
+                                          </GridPane>
+
+                                          <Separator styleClass="separator" />
+
+                                          <!-- Main telemetry data grid -->
+                                          <GridPane hgap="20.0" vgap="2.0">
+                                             <children>
+                                                <!-- Column 1 -->
+                                                <Label styleClass="telemetry-label" text="Battery Voltage:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                                <Label fx:id="batteryVoltageLabel" styleClass="telemetry-value" text="0.0V" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                                                <Label styleClass="telemetry-label" text="Battery Status:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                                <Label fx:id="batteryStatusLabel" styleClass="telemetry-value" text="0%" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+
+                                                <Label styleClass="telemetry-label" text="Altitude:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                                                <Label fx:id="altitudeLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+
+                                                <Label styleClass="telemetry-label" text="GPS Altitude:" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                                                <Label fx:id="gpsAltitudeLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+
+                                                <Label styleClass="telemetry-label" text="Ground Speed:" GridPane.columnIndex="0" GridPane.rowIndex="4" />
+                                                <Label fx:id="speedLabel" styleClass="telemetry-value" text="0.0 m/s" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+
+                                                <Label styleClass="telemetry-label" text="Pressure:" GridPane.columnIndex="0" GridPane.rowIndex="5" />
+                                                <Label fx:id="pressureLabel" styleClass="telemetry-value" text="0.0 hPa" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+
+                                                <!-- Column 2 -->
+                                                <Label styleClass="telemetry-label" text="GPS Latitude:" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                                                <Label fx:id="gpsLatitudeLabel" styleClass="telemetry-value" text="0.000000" GridPane.columnIndex="3" GridPane.rowIndex="0" />
+
+                                                <Label styleClass="telemetry-label" text="GPS Longitude:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                                                <Label fx:id="gpsLongitudeLabel" styleClass="telemetry-value" text="0.000000" GridPane.columnIndex="3" GridPane.rowIndex="1" />
+
+                                                <Label styleClass="telemetry-label" text="Satellites:" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                                                <Label fx:id="satellitesLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="3" GridPane.rowIndex="2" />
+
+                                                <Label styleClass="telemetry-label" text="Vertical Velocity:" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                                                <Label fx:id="verticalVelocityLabel" styleClass="telemetry-value" text="0.0 m/s" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+
+                                                <Label styleClass="telemetry-label" text="Distance:" GridPane.columnIndex="2" GridPane.rowIndex="4" />
+                                                <Label fx:id="distanceLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="3" GridPane.rowIndex="4" />
+
+                                                <Label styleClass="telemetry-label" text="Internal Temp:" GridPane.columnIndex="2" GridPane.rowIndex="5" />
+                                                <Label fx:id="internalTempLabel" styleClass="telemetry-value" text="0.0°C" GridPane.columnIndex="3" GridPane.rowIndex="5" />
+
+                                                <!-- Column 3 -->
+                                                <Label styleClass="telemetry-label" text="Flight Mode:" GridPane.columnIndex="4" GridPane.rowIndex="0" />
+                                                <Label fx:id="flightModeLabel" styleClass="telemetry-value" text="Unknown" GridPane.columnIndex="5" GridPane.rowIndex="0" />
+
+                                                <Label styleClass="telemetry-label" text="Arm Status:" GridPane.columnIndex="4" GridPane.rowIndex="1" />
+                                                <Label fx:id="armStatusLabel" styleClass="telemetry-value" text="DISARMED" GridPane.columnIndex="5" GridPane.rowIndex="1" />
+
+                                                <Label styleClass="telemetry-label" text="Pitch:" GridPane.columnIndex="4" GridPane.rowIndex="2" />
+                                                <Label fx:id="pitchLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="2" />
+
+                                                <Label styleClass="telemetry-label" text="Roll:" GridPane.columnIndex="4" GridPane.rowIndex="3" />
+                                                <Label fx:id="rollLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="3" />
+
+                                                <Label styleClass="telemetry-label" text="Yaw:" GridPane.columnIndex="4" GridPane.rowIndex="4" />
+                                                <Label fx:id="yawLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="4" />
+
+                                                <Label styleClass="telemetry-label" text="External Temp:" GridPane.columnIndex="4" GridPane.rowIndex="5" />
+                                                <Label fx:id="externalTempLabel" styleClass="telemetry-value" text="0.0°C" GridPane.columnIndex="5" GridPane.rowIndex="5" />
+                                             </children>
+                                             <columnConstraints>
+                                                <ColumnConstraints minWidth="90.0" prefWidth="95.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                                <ColumnConstraints minWidth="90.0" prefWidth="95.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                                <ColumnConstraints minWidth="80.0" prefWidth="85.0" />
+                                                <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
+                                             </columnConstraints>
+                                             <rowConstraints>
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                                <RowConstraints minHeight="18.0" maxHeight="20.0" prefHeight="19.0" />
+                                             </rowConstraints>
+                                             <padding>
+                                                <Insets bottom="2.0" left="8.0" right="8.0" top="2.0" />
+                                             </padding>
+                                          </GridPane>
+                                       </children>
+                                    </VBox>
+
+                                    <!-- Right side - 3D Orientation Visualization -->
+                                    <VBox alignment="CENTER" maxHeight="204.0" maxWidth="200.0" minWidth="200.0" prefWidth="200.0" spacing="4.0" styleClass="orientation-3d-container">
+                                       <children>
+                                          <!-- 3D View Container -->
+                                          <StackPane fx:id="satellite3DContainer" prefHeight="140.0" prefWidth="180.0" styleClass="satellite-3d-view">
+                                             <children>
+                                                <Label fx:id="orientation3DPlaceholder" styleClass="info-label" text="3D View" />
+                                             </children>
+                                          </StackPane>
+
+                                          <!-- Orientation Values Display -->
+                                          <GridPane alignment="CENTER" hgap="5.0" vgap="1.0">
+                                             <children>
+                                                <Label styleClass="orientation-label" text="Pitch:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                                                <Label fx:id="pitch3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+
+                                                <Label styleClass="orientation-label" text="Roll:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                                                <Label fx:id="roll3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+
+                                                <Label styleClass="orientation-label" text="Yaw:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                                                <Label fx:id="yaw3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                             </children>
+                                             <columnConstraints>
+                                                <ColumnConstraints minWidth="35.0" />
+                                                <ColumnConstraints minWidth="45.0" />
+                                             </columnConstraints>
+                                             <rowConstraints>
+                                                <RowConstraints />
+                                                <RowConstraints />
+                                                <RowConstraints />
+                                             </rowConstraints>
+                                          </GridPane>
+                                       </children>
+                                       <padding>
+                                          <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                    </VBox>
+                                 </children>
+                              </HBox>
+
+                              <!-- Placeholder for telemetry (shown when disconnected) -->
+                              <VBox fx:id="telemetryPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
+                                 <children>
+                                    <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
+                                       <image>
+                                          <Image url="@../../images/dark-icon.png" />
+                                       </image>
+                                    </ImageView>
+                                    <Label styleClass="info-label" text="Telemetry data will appear here" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </StackPane>
+
+                        <!-- BOTTOM SECTION - Three Equal Parts -->
+                        <HBox spacing="8.0" VBox.vgrow="ALWAYS">
+                           <children>
+                              <!-- Left Part - Serial Monitor with LoRa Support -->
+                              <VBox alignment="TOP_LEFT" minWidth="200.0" prefWidth="450.0" spacing="8.0" styleClass="content-area" HBox.hgrow="ALWAYS">
+                                 <padding>
+                                    <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
+                                 </padding>
+                                 <children>
+                                    <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                       <children>
+                                          <Label styleClass="section-header" text="Serial Monitor" />
+                                          <Region HBox.hgrow="ALWAYS" />
+                                          <!-- LoRa Mode Indicator -->
+                                          <Label fx:id="loRaModeIndicator" text="● LoRa Mode" styleClass="status-connected" visible="false">
+                                             <tooltip>
+                                                <Tooltip text="XOR encryption is active for LoRa communication" />
+                                             </tooltip>
+                                          </Label>
+                                       </children>
                                     </HBox>
 
-                                    <Label styleClass="telemetry-label" text="Packet Count:" GridPane.columnIndex="6" />
-                                    <Label fx:id="packetCountLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="7" />
+                                    <!-- Serial Messages Display -->
+                                    <ScrollPane fx:id="serialScrollPane" fitToWidth="true" styleClass="serial-scroll-pane" VBox.vgrow="ALWAYS">
+                                       <content>
+                                          <VBox fx:id="serialMessageContainer" spacing="2.0" styleClass="serial-message-container">
+                                             <padding>
+                                                <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                             </padding>
+                                          </VBox>
+                                       </content>
+                                    </ScrollPane>
 
-                                    <Label styleClass="telemetry-label" text="Mission Time:" GridPane.columnIndex="8" />
-                                    <Label fx:id="missionTimeLabel" styleClass="telemetry-value" text="01/01/2025 00:00:00" GridPane.columnIndex="9" />
-                                 </children>
-                                 <columnConstraints>
-                                    <ColumnConstraints maxWidth="60.0" minWidth="55.0" prefWidth="58.0" />
-                                    <ColumnConstraints maxWidth="65.0" minWidth="60.0" prefWidth="63.0" />
-                                    <ColumnConstraints minWidth="80.0" prefWidth="85.0" />
-                                    <ColumnConstraints minWidth="40.0" prefWidth="45.0" />
-                                    <ColumnConstraints minWidth="65.0" prefWidth="70.0" />
-                                    <ColumnConstraints minWidth="90.0" prefWidth="95.0" />
-                                    <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
-                                    <ColumnConstraints minWidth="80.0" prefWidth="85.0" />
-                                    <ColumnConstraints minWidth="80.0" prefWidth="85.0" />
-                                    <ColumnConstraints minWidth="125.0" prefWidth="130.0" />
-                                 </columnConstraints>
-                                 <rowConstraints>
-                                    <RowConstraints />
-                                 </rowConstraints>
-                                 <VBox.margin>
-                                    <Insets top="2.0" />
-                                 </VBox.margin>
-                              </GridPane>
-
-                              <Separator styleClass="separator" />
-
-                              <!-- Main telemetry data grid - Compact with scroll if needed -->
-                              <ScrollPane fitToWidth="true" hbarPolicy="NEVER" maxHeight="180.0" style="-fx-background-color: transparent; -fx-background: transparent;" vbarPolicy="AS_NEEDED">
-                                 <content>
-                                    <GridPane hgap="20.0" styleClass="telemetry-grid" vgap="6.0">
+                                    <!-- Input Controls -->
+                                    <HBox alignment="CENTER_LEFT" spacing="5.0">
                                        <children>
-                                          <!-- Column 1 -->
-                                          <Label styleClass="telemetry-label" text="Battery Voltage:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                                          <Label fx:id="batteryVoltageLabel" styleClass="telemetry-value" text="0.0V" GridPane.columnIndex="1" GridPane.rowIndex="0" />
-
-                                          <Label styleClass="telemetry-label" text="Battery Status:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                                          <Label fx:id="batteryStatusLabel" styleClass="telemetry-value" text="0%" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-
-                                          <Label styleClass="telemetry-label" text="Altitude:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                                          <Label fx:id="altitudeLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="1" GridPane.rowIndex="2" />
-
-                                          <Label styleClass="telemetry-label" text="GPS Altitude:" GridPane.columnIndex="0" GridPane.rowIndex="3" />
-                                          <Label fx:id="gpsAltitudeLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-
-                                          <Label styleClass="telemetry-label" text="Ground Speed:" GridPane.columnIndex="0" GridPane.rowIndex="4" />
-                                          <Label fx:id="speedLabel" styleClass="telemetry-value" text="0.0 m/s" GridPane.columnIndex="1" GridPane.rowIndex="4" />
-
-                                          <Label styleClass="telemetry-label" text="Pressure:" GridPane.columnIndex="0" GridPane.rowIndex="5" />
-                                          <Label fx:id="pressureLabel" styleClass="telemetry-value" text="0.0 hPa" GridPane.columnIndex="1" GridPane.rowIndex="5" />
-
-                                          <!-- Column 2 -->
-                                          <Label styleClass="telemetry-label" text="GPS Latitude:" GridPane.columnIndex="2" GridPane.rowIndex="0" />
-                                          <Label fx:id="gpsLatitudeLabel" styleClass="telemetry-value" text="0.000000" GridPane.columnIndex="3" GridPane.rowIndex="0" />
-
-                                          <Label styleClass="telemetry-label" text="GPS Longitude:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
-                                          <Label fx:id="gpsLongitudeLabel" styleClass="telemetry-value" text="0.000000" GridPane.columnIndex="3" GridPane.rowIndex="1" />
-
-                                          <Label styleClass="telemetry-label" text="Satellites:" GridPane.columnIndex="2" GridPane.rowIndex="2" />
-                                          <Label fx:id="satellitesLabel" styleClass="telemetry-value" text="0" GridPane.columnIndex="3" GridPane.rowIndex="2" />
-
-                                          <Label styleClass="telemetry-label" text="Vertical Velocity:" GridPane.columnIndex="2" GridPane.rowIndex="3" />
-                                          <Label fx:id="verticalVelocityLabel" styleClass="telemetry-value" text="0.0 m/s" GridPane.columnIndex="3" GridPane.rowIndex="3" />
-
-                                          <Label styleClass="telemetry-label" text="Distance:" GridPane.columnIndex="2" GridPane.rowIndex="4" />
-                                          <Label fx:id="distanceLabel" styleClass="telemetry-value" text="0.0 m" GridPane.columnIndex="3" GridPane.rowIndex="4" />
-
-                                          <Label styleClass="telemetry-label" text="Internal Temp:" GridPane.columnIndex="2" GridPane.rowIndex="5" />
-                                          <Label fx:id="internalTempLabel" styleClass="telemetry-value" text="0.0°C" GridPane.columnIndex="3" GridPane.rowIndex="5" />
-
-                                          <!-- Column 3 -->
-                                          <Label styleClass="telemetry-label" text="Flight Mode:" GridPane.columnIndex="4" GridPane.rowIndex="0" />
-                                          <Label fx:id="flightModeLabel" styleClass="telemetry-value" text="Unknown" GridPane.columnIndex="5" GridPane.rowIndex="0" />
-
-                                          <Label styleClass="telemetry-label" text="Arm Status:" GridPane.columnIndex="4" GridPane.rowIndex="1" />
-                                          <Label fx:id="armStatusLabel" styleClass="telemetry-value" text="DISARMED" GridPane.columnIndex="5" GridPane.rowIndex="1" />
-
-                                          <Label styleClass="telemetry-label" text="Pitch:" GridPane.columnIndex="4" GridPane.rowIndex="2" />
-                                          <Label fx:id="pitchLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="2" />
-
-                                          <Label styleClass="telemetry-label" text="Roll:" GridPane.columnIndex="4" GridPane.rowIndex="3" />
-                                          <Label fx:id="rollLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="3" />
-
-                                          <Label styleClass="telemetry-label" text="Yaw:" GridPane.columnIndex="4" GridPane.rowIndex="4" />
-                                          <Label fx:id="yawLabel" styleClass="telemetry-value" text="0.0°" GridPane.columnIndex="5" GridPane.rowIndex="4" />
-
-                                          <Label styleClass="telemetry-label" text="External Temp:" GridPane.columnIndex="4" GridPane.rowIndex="5" />
-                                          <Label fx:id="externalTempLabel" styleClass="telemetry-value" text="0.0°C" GridPane.columnIndex="5" GridPane.rowIndex="5" />
+                                          <TextField fx:id="serialInputField" promptText="Enter command..." styleClass="serial-input" HBox.hgrow="ALWAYS" />
+                                          <Button fx:id="serialSendButton" minWidth="60.0" styleClass="serial-send-button" text="Send" />
+                                          <Button fx:id="serialClearButton" minWidth="60.0" styleClass="serial-clear-button" text="Clear" />
                                        </children>
-                                       <columnConstraints>
-                                          <ColumnConstraints minWidth="90.0" prefWidth="95.0" />
-                                          <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
-                                          <ColumnConstraints minWidth="90.0" prefWidth="95.0" />
-                                          <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
-                                          <ColumnConstraints minWidth="80.0" prefWidth="85.0" />
-                                          <ColumnConstraints minWidth="75.0" prefWidth="80.0" />
-                                       </columnConstraints>
-                                       <rowConstraints>
-                                          <RowConstraints minHeight="14.0" />
-                                          <RowConstraints minHeight="14.0" />
-                                          <RowConstraints minHeight="14.0" />
-                                          <RowConstraints minHeight="14.0" />
-                                          <RowConstraints minHeight="14.0" />
-                                          <RowConstraints minHeight="14.0" />
-                                       </rowConstraints>
-                                    </GridPane>
-                                 </content>
-                              </ScrollPane>
-                           </children>
-                        </VBox>
+                                    </HBox>
+                                 </children>
+                              </VBox>
 
-                        <!-- Right side - 3D Orientation Visualization - Compact -->
-                        <VBox alignment="CENTER" maxHeight="240.0" maxWidth="220.0" minWidth="220.0" prefWidth="220.0" spacing="6.0" styleClass="orientation-3d-container">
-                           <children>
-                              <Label styleClass="section-header" text="Satellite Orientation" />
-
-                              <!-- 3D View Container -->
-                              <StackPane fx:id="satellite3DContainer" prefHeight="160.0" prefWidth="200.0" styleClass="satellite-3d-view">
+                              <!-- Middle Part - Video Feed -->
+                              <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
                                  <children>
-                                    <!-- 3D SubScene will be added here programmatically -->
-                                    <Label fx:id="orientation3DPlaceholder" styleClass="info-label" text="3D View" />
+                                    <!-- Video Panel (shown when connected) -->
+                                    <VBox fx:id="videoPanel" alignment="TOP_LEFT" managed="false" spacing="8.0" visible="false">
+                                       <padding>
+                                          <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
+                                       </padding>
+                                       <children>
+                                          <HBox alignment="CENTER_LEFT" spacing="10.0">
+                                             <children>
+                                                <Label styleClass="section-header" text="Video Feed" />
+                                                <Region HBox.hgrow="ALWAYS" />
+                                                <Button fx:id="videoExpandBtn" styleClass="expand-button" text="Expand" />
+                                             </children>
+                                          </HBox>
+                                          <StackPane fx:id="videoContainer" styleClass="video-container" VBox.vgrow="ALWAYS">
+                                             <children>
+                                                <Label styleClass="info-label" text="Video feed connected" />
+                                             </children>
+                                          </StackPane>
+                                       </children>
+                                    </VBox>
+
+                                    <!-- Placeholder for video (shown when disconnected) -->
+                                    <VBox fx:id="videoPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
+                                       <children>
+                                          <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
+                                             <image>
+                                                <Image url="@../../images/dark-icon.png" />
+                                             </image>
+                                          </ImageView>
+                                          <Label styleClass="info-label" text="Video feed will appear here" />
+                                       </children>
+                                    </VBox>
                                  </children>
                               </StackPane>
 
-                              <!-- Orientation Values Display -->
-                              <GridPane alignment="CENTER" hgap="6.0" vgap="2.0">
+                              <!-- Right Part - GPS Map -->
+                              <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
                                  <children>
-                                    <Label styleClass="orientation-label" text="Pitch:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
-                                    <Label fx:id="pitch3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                                    <!-- Map Panel (shown when telemetry connected) -->
+                                    <VBox fx:id="mapPanel" alignment="TOP_LEFT" managed="false" spacing="8.0" visible="false">
+                                       <padding>
+                                          <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
+                                       </padding>
+                                       <children>
+                                          <Label styleClass="section-header" text="GPS Map" />
+                                          <WebView fx:id="mapWebView" VBox.vgrow="ALWAYS" />
+                                       </children>
+                                    </VBox>
 
-                                    <Label styleClass="orientation-label" text="Roll:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                                    <Label fx:id="roll3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-
-                                    <Label styleClass="orientation-label" text="Yaw:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
-                                    <Label fx:id="yaw3DLabel" styleClass="orientation-value" text="0.0°" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                                    <!-- Placeholder for map (shown when disconnected) -->
+                                    <VBox fx:id="mapPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
+                                       <children>
+                                          <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
+                                             <image>
+                                                <Image url="@../../images/dark-icon.png" />
+                                             </image>
+                                          </ImageView>
+                                          <Label styleClass="info-label" text="Map will appear here when telemetry is connected" />
+                                       </children>
+                                    </VBox>
                                  </children>
-                                 <columnConstraints>
-                                    <ColumnConstraints minWidth="40.0" />
-                                    <ColumnConstraints minWidth="50.0" />
-                                 </columnConstraints>
-                                 <rowConstraints>
-                                    <RowConstraints />
-                                    <RowConstraints />
-                                    <RowConstraints />
-                                 </rowConstraints>
-                              </GridPane>
-                           </children>
-                           <padding>
-                              <Insets bottom="6.0" left="6.0" right="6.0" top="6.0" />
-                           </padding>
-                        </VBox>
-                     </children>
-                  </HBox>
-
-                  <!-- Placeholder for telemetry (shown when disconnected) -->
-                  <VBox fx:id="telemetryPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
-                     <children>
-                        <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
-                           <image>
-                              <Image url="@../../images/dark-icon.png" />
-                           </image>
-                        </ImageView>
-                        <Label styleClass="info-label" text="Telemetry data will appear here" />
-                     </children>
-                     <StackPane.margin>
-                        <Insets />
-                     </StackPane.margin>
-                  </VBox>
-               </children>
-            </StackPane>
-
-            <!-- BOTTOM SECTION - Three Equal Parts (Messages, Video, Map) - More Compact -->
-            <HBox spacing="8.0" VBox.vgrow="ALWAYS">
-               <children>
-                  <!-- Left Part - Serial Monitor -->
-                  <VBox alignment="TOP_LEFT" minWidth="200.0" prefWidth="450.0" spacing="8.0" styleClass="content-area" HBox.hgrow="ALWAYS">
-                     <padding>
-                        <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
-                     </padding>
-                     <children>
-                        <Label styleClass="section-header" text="Serial Monitor" />
-
-                        <!-- Serial Messages Display -->
-                        <ScrollPane fx:id="serialScrollPane" fitToWidth="true" styleClass="serial-scroll-pane" VBox.vgrow="ALWAYS">
-                           <content>
-                              <VBox fx:id="serialMessageContainer" spacing="2.0" styleClass="serial-message-container">
-                                 <padding>
-                                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
-                                 </padding>
-                              </VBox>
-                           </content>
-                        </ScrollPane>
-
-                        <!-- Input Controls -->
-                        <HBox alignment="CENTER_LEFT" spacing="5.0">
-                           <children>
-                              <TextField fx:id="serialInputField" promptText="Enter command..." styleClass="serial-input" HBox.hgrow="ALWAYS" />
-                              <Button fx:id="serialSendButton" minWidth="60.0" styleClass="serial-send-button" text="Send" />
-                              <Button fx:id="serialClearButton" minWidth="60.0" styleClass="serial-clear-button" text="Clear" />
+                              </StackPane>
                            </children>
                         </HBox>
                      </children>
                   </VBox>
+               </content>
+            </Tab>
 
-                  <!-- Middle Part - Video Feed -->
-                  <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
+            <!-- SD Card Logs Tab -->
+            <Tab text="SD Card Logs" closable="false">
+               <content>
+                  <VBox spacing="10.0">
+                     <padding>
+                        <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                     </padding>
                      <children>
-                        <!-- Video Panel (shown when connected) -->
-                        <VBox fx:id="videoPanel" alignment="TOP_LEFT" managed="false" spacing="8.0" visible="false">
-                           <padding>
-                              <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
-                           </padding>
+                        <!-- SD Card Log Controls -->
+                        <HBox spacing="10.0" alignment="CENTER_LEFT">
                            <children>
-                              <HBox alignment="CENTER_LEFT" spacing="10.0">
+                              <Label text="Filter:" styleClass="info-label" />
+                              <TextField fx:id="sdLogFilterField" promptText="Search in logs..." prefWidth="200.0" />
+                              <CheckBox fx:id="encryptedOnlyCheckbox" text="Encrypted Only" />
+                              <Button fx:id="refreshSDLogsBtn" text="Refresh" styleClass="button" />
+                              <Region HBox.hgrow="ALWAYS" />
+                              <Label fx:id="encryptedCountLabel" styleClass="info-label" text="0 encrypted messages" />
+                           </children>
+                        </HBox>
+
+                        <!-- SD Card Log Table -->
+                        <TableView fx:id="sdLogTable" VBox.vgrow="ALWAYS">
+                           <placeholder>
+                              <Label text="No SD card logs loaded. Click 'Read SD Card' to load logs." />
+                           </placeholder>
+                        </TableView>
+
+                        <!-- Log Details Area -->
+                        <TitledPane text="Message Details" expanded="false">
+                           <content>
+                              <VBox spacing="5.0">
                                  <children>
-                                    <Region HBox.hgrow="ALWAYS" />
-                                    <Button fx:id="videoExpandBtn" styleClass="expand-button" text="Expand" />
+                                    <HBox spacing="10.0">
+                                       <children>
+                                          <Label text="Original:" styleClass="info-label" minWidth="80.0" />
+                                          <TextField fx:id="originalMessageField" editable="false" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0">
+                                       <children>
+                                          <Label text="Decrypted:" styleClass="info-label" minWidth="80.0" />
+                                          <TextField fx:id="decryptedMessageField" editable="false" HBox.hgrow="ALWAYS" />
+                                       </children>
+                                    </HBox>
+                                    <HBox spacing="10.0">
+                                       <children>
+                                          <Label text="Timestamp:" styleClass="info-label" minWidth="80.0" />
+                                          <Label fx:id="messageTimestampLabel" styleClass="telemetry-value" />
+                                          <Region HBox.hgrow="ALWAYS" />
+                                          <Button fx:id="copyDecryptedBtn" text="Copy Decrypted" styleClass="button" />
+                                       </children>
+                                    </HBox>
                                  </children>
-                              </HBox>
-                              <StackPane fx:id="videoContainer" styleClass="video-container" VBox.vgrow="ALWAYS">
-                                 <children>
-                                    <Label styleClass="info-label" text="Video feed connected" />
-                                 </children>
-                              </StackPane>
-                           </children>
-                        </VBox>
-
-                        <!-- Placeholder for video (shown when disconnected) -->
-                        <VBox fx:id="videoPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
-                           <children>
-                              <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
-                                 <image>
-                                    <Image url="@../../images/dark-icon.png" />
-                                 </image>
-                              </ImageView>
-                              <Label styleClass="info-label" text="Video feed will appear here" />
-                           </children>
-                        </VBox>
+                              </VBox>
+                           </content>
+                        </TitledPane>
                      </children>
-                  </StackPane>
-
-                  <!-- Right Part - GPS Map -->
-                  <StackPane minWidth="200.0" prefWidth="450.0" styleClass="content-area" HBox.hgrow="ALWAYS">
-                     <children>
-                        <!-- Map Panel (shown when telemetry connected) -->
-                        <VBox fx:id="mapPanel" alignment="TOP_LEFT" managed="false" spacing="8.0" visible="false">
-                           <padding>
-                              <Insets bottom="12.0" left="15.0" right="15.0" top="12.0" />
-                           </padding>
-                           <children>
-                              <WebView fx:id="mapWebView" VBox.vgrow="ALWAYS" />
-                           </children>
-                        </VBox>
-
-                        <!-- Placeholder for map (shown when disconnected) -->
-                        <VBox fx:id="mapPlaceholder" alignment="CENTER" spacing="8.0" styleClass="connection-box">
-                           <children>
-                              <ImageView fitHeight="120.0" fitWidth="120.0" pickOnBounds="true" preserveRatio="true">
-                                 <image>
-                                    <Image url="@../../images/dark-icon.png" />
-                                 </image>
-                              </ImageView>
-                              <Label styleClass="info-label" text="Map will appear here when telemetry is connected" />
-                           </children>
-                        </VBox>
-                     </children>
-                  </StackPane>
-               </children>
-            </HBox>
-         </children>
-      </VBox>
+                  </VBox>
+               </content>
+            </Tab>
+         </tabs>
+      </TabPane>
    </children>
    <padding>
       <Insets top="8.0" />
