@@ -8,6 +8,8 @@ import javafx.scene.shape.Box;
 import javafx.scene.shape.Cylinder;
 import javafx.scene.transform.Rotate;
 
+import com.example.satelliteapplication.constants.ApplicationConstants;
+
 /**
  * 3D viewer component for visualizing satellite orientation (yaw, pitch, roll)
  */
@@ -31,7 +33,6 @@ public class Satellite3DViewer {
     private double currentYaw = 0;
 
     private AnimationTimer animationTimer;
-    private static final double INTERPOLATION_SPEED = 0.15; // Smoothing factor
 
     public Satellite3DViewer(double width, double height) {
         // Create 3D root
@@ -41,16 +42,20 @@ public class Satellite3DViewer {
         Group satelliteGroup = new Group();
 
         // Create satellite body (rectangular box)
-        Box satelliteBody = new Box(60, 20, 40);
+        Box satelliteBody = new Box(
+            ApplicationConstants.SATELLITE_BODY_WIDTH, 
+            ApplicationConstants.SATELLITE_BODY_HEIGHT, 
+            ApplicationConstants.SATELLITE_BODY_DEPTH
+        );
         PhongMaterial bodyMaterial = new PhongMaterial();
-        bodyMaterial.setDiffuseColor(Color.web("#3498db"));
+        bodyMaterial.setDiffuseColor(Color.web(ApplicationConstants.PRIMARY_COLOR));
         bodyMaterial.setSpecularColor(Color.web("#5dade2"));
         satelliteBody.setMaterial(bodyMaterial);
 
         // Create front indicator (small cylinder to show forward direction)
         Cylinder frontIndicator = new Cylinder(3, 15);
         PhongMaterial indicatorMaterial = new PhongMaterial();
-        indicatorMaterial.setDiffuseColor(Color.web("#e74c3c"));
+        indicatorMaterial.setDiffuseColor(Color.web(ApplicationConstants.ACCENT_COLOR));
         indicatorMaterial.setSpecularColor(Color.web("#ec7063"));
         frontIndicator.setMaterial(indicatorMaterial);
         frontIndicator.setTranslateX(35); // Position at front of satellite
@@ -60,7 +65,7 @@ public class Satellite3DViewer {
         // Add solar panels (simplified as thin boxes)
         Box leftPanel = new Box(5, 18, 60);
         PhongMaterial panelMaterial = new PhongMaterial();
-        panelMaterial.setDiffuseColor(Color.web("#2c3e50"));
+        panelMaterial.setDiffuseColor(Color.web(ApplicationConstants.SECONDARY_COLOR));
         panelMaterial.setSpecularColor(Color.web("#34495e"));
         leftPanel.setMaterial(panelMaterial);
         leftPanel.setTranslateX(-35);
@@ -72,7 +77,7 @@ public class Satellite3DViewer {
         // Add antenna (simplified as thin cylinder)
         Cylinder antenna = new Cylinder(1, 25);
         PhongMaterial antennaMaterial = new PhongMaterial();
-        antennaMaterial.setDiffuseColor(Color.web("#7f8c8d"));
+        antennaMaterial.setDiffuseColor(Color.web(ApplicationConstants.NEUTRAL_COLOR));
         antenna.setMaterial(antennaMaterial);
         antenna.setTranslateY(-20);
 
@@ -96,7 +101,7 @@ public class Satellite3DViewer {
 
         // Create camera
         PerspectiveCamera camera = new PerspectiveCamera(true);
-        camera.setTranslateZ(-200);
+        camera.setTranslateZ(ApplicationConstants.CAMERA_DISTANCE);
         camera.setNearClip(0.1);
         camera.setFarClip(1000);
         camera.setFieldOfView(35);
@@ -126,9 +131,9 @@ public class Satellite3DViewer {
             @Override
             public void handle(long now) {
                 // Smoothly interpolate to target angles
-                currentPitch += (targetPitch - currentPitch) * INTERPOLATION_SPEED;
-                currentRoll += (targetRoll - currentRoll) * INTERPOLATION_SPEED;
-                currentYaw += (targetYaw - currentYaw) * INTERPOLATION_SPEED;
+                currentPitch += (targetPitch - currentPitch) * ApplicationConstants.INTERPOLATION_SPEED;
+                currentRoll += (targetRoll - currentRoll) * ApplicationConstants.INTERPOLATION_SPEED;
+                currentYaw += (targetYaw - currentYaw) * ApplicationConstants.INTERPOLATION_SPEED;
 
                 // Apply rotations
                 rotateX.setAngle(currentPitch);

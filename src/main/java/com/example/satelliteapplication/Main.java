@@ -4,6 +4,8 @@ import javafx.application.Application;
 import org.bytedeco.javacpp.Loader;
 import org.bytedeco.opencv.opencv_java;
 
+import com.example.satelliteapplication.constants.ApplicationConstants;
+
 public class Main {
     static {
         // Initialize JavaCV/OpenCV with better error handling

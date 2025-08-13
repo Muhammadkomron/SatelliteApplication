@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.Objects;
 
 import com.example.satelliteapplication.controller.MainController;
+import com.example.satelliteapplication.constants.ApplicationConstants;
 
 public class SatelliteGCS extends Application {
     private MainController mainController;
@@ -18,9 +19,9 @@ public class SatelliteGCS extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         // Set application icon
-        Image icon = new Image("/images/light-icon.png");
+        Image icon = new Image(ApplicationConstants.APPLICATION_ICON_PATH);
         stage.getIcons().add(icon);
-        stage.setTitle("NazarX Ground Control Station");
+        stage.setTitle(ApplicationConstants.APPLICATION_TITLE);
 
         // Load FXML with controller
         FXMLLoader loader = new FXMLLoader(
